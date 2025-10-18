@@ -231,6 +231,17 @@ export default function AssistantPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF8DC] via-[#FFE4B5] to-[#FFDAB9] relative overflow-hidden">
+      {/* Custom CSS to override KopiColt2D positioning for assistant page */}
+      <style jsx>{`
+        .assistant-kopi-override :global(.fixed) {
+          position: absolute !important;
+          bottom: auto !important;
+          right: auto !important;
+          left: 50% !important;
+          top: 50% !important;
+          transform: translate(-50%, -50%) !important;
+        }
+      `}</style>
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-[#E5E5E5]">
         <div className="container mx-auto px-6 py-4">
@@ -258,13 +269,15 @@ export default function AssistantPage() {
       <div className="container mx-auto px-6 py-8 max-w-6xl">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-180px)]">
           {/* Kopi Colt Character - Left Side */}
-          <div className="lg:col-span-1 flex items-center justify-center">
-            <div className="relative">
-              <KopiColt2D 
-                expression={isProcessing ? 'neutral' : isSpeaking ? 'happy' : 'neutral'}
-                step={0}
-                isIntro={false}
-              />
+          <div className="lg:col-span-1 flex items-center justify-center relative assistant-kopi-override">
+            <div className="relative w-full h-full">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <KopiColt2D 
+                  expression={isProcessing ? 'neutral' : isSpeaking ? 'happy' : 'neutral'}
+                  step={0}
+                  isIntro={false}
+                />
+              </div>
               
               {/* Status indicator */}
               <motion.div
