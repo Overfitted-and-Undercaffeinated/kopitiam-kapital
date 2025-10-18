@@ -94,15 +94,14 @@ Entry/Exit rules must specify:
 5. "mean reversion"
 {
   "name": "Mean Reversion",
-  "description": "Buy when price is below 20-day SMA and RSI is oversold, sell when price returns to SMA",
+  "description": "Buy when RSI is oversold, sell when RSI is overbought",
   "category": "Mean Reversion",
-  "indicators": [{"type": "sma", "period": 20}, {"type": "rsi", "period": 14}],
+  "indicators": [{"type": "rsi", "period": 14}],
   "entry_rules": [
-    {"indicator": "price", "condition": "<", "value": "sma_20"},
     {"indicator": "rsi", "condition": "<", "value": 30}
   ],
   "exit_rules": [
-    {"indicator": "price", "condition": ">", "value": "sma_20"}
+    {"indicator": "rsi", "condition": ">", "value": 70}
   ],
   "position_sizing": {"type": "fixed_percent", "value": 0.10},
   "risk_management": {"stop_loss_percent": 0.05, "take_profit_percent": 0.10}
