@@ -25,16 +25,193 @@ interface BriefOverlayProps {
       positions: number
     }
   }
+  rawBackendData?: any // Raw JSON from Python backend
 }
 
-export default function BriefOverlay({ isOpen, onClose, type, brief }: BriefOverlayProps) {
+export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendData }: BriefOverlayProps) {
   const isMorning = type === 'morning'
   const [currentSection, setCurrentSection] = useState(0)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Define sections with their content and narration
+  // If we have raw backend data, display it directly
+  if (rawBackendData) {
+    const sections = [
+      {
+        title: 'Backend Response',
+        narration: rawBackendData.text || "Here's what the AI backend generated, partner!",
+        content: (
+          <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
+            <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">Raw Backend Output</h3>
+            <pre className="text-xs text-[#4A3F35] leading-relaxed whitespace-pre-wrap font-mono bg-white p-4 rounded border border-[#E5E5E5] max-h-[400px] overflow-auto">
+              {JSON.stringify(rawBackendData, null, 2)}
+            </pre>
+          </div>
+        )
+      },
+      {
+        title: 'Generated Text',
+        narration: rawBackendData.text || "No text available",
+        content: (
+          <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
+            <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">AI Generated Brief</h3>
+            <div className="text-[#4A3F35] leading-relaxed whitespace-pre-wrap">
+              {rawBackendData.text}
+            </div>
+          </div>
+        )
+      }
+    ]
+
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-[#2F1810]/60 backdrop-blur-sm z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+            />
+
+            <div className="z-50" style={{ pointerEvents: 'none' }}>
+              <motion.div
+                initial={{ y: 0, x: 0, opacity: 1, rotate: 0 }}
+                animate={isClosing ? {
+                  y: -1000,
+                  x: 200,
+                  opacity: 0,
+                  rotate: -15,
+                  scale: 0.8
+                } : {
+                  y: 0,
+                  x: 0,
+                  opacity: 1,
+                  rotate: 0,
+                  scale: 1
+                }}
+                transition={{
+                  duration: 1.2,
+                  ease: [0.6, 0.05, 0.01, 0.9]
+                }}
+              >
+                <KopiColt2D
+                  expression={isClosing ? 'happy' : 'neutral'}
+                  step={currentSection}
+                  isIntro={false}
+                />
+              </motion.div>
+            </div>
+
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                className="max-w-3xl w-full max-h-[80vh] overflow-y-auto rounded-lg shadow-2xl bg-white border border-[#E5E5E5] pointer-events-auto"
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={isClosing ? {
+                  scale: 0.9,
+                  opacity: 0,
+                  y: 50
+                } : {
+                  scale: 1,
+                  opacity: 1,
+                  y: 0
+                }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              >
+                <div className="sticky top-0 bg-white border-b border-[#E5E5E5] p-6 flex items-center justify-between z-10">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-sm font-bold ${
+                      isMorning 
+                        ? 'bg-[#8B7355] text-white' 
+                        : 'bg-[#6F5D47] text-white'
+                    }`}>
+                      {isMorning ? 'AM' : 'PM'}
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-[#2F1810]">
+                        {isMorning ? 'Morning Brief from Kopi Colt' : 'EOD Report from Kopi Colt'}
+                      </h2>
+                      <p className="text-sm text-[#6B5D52] mt-0.5">
+                        {new Date().toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <motion.button
+                    onClick={onClose}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-10 h-10 rounded-lg bg-[#FAFAF9] hover:bg-[#F5F5F4] flex items-center justify-center text-[#6B5D52] hover:text-[#2F1810] transition-colors border border-[#E5E5E5]"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentSection}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {sections[currentSection].content}
+                    </motion.div>
+                  </AnimatePresence>
+
+                  <div className="flex items-center gap-2 justify-center">
+                    {sections.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={`h-2 rounded-full transition-all ${
+                          idx === currentSection
+                            ? 'w-8 bg-[#8B7355]'
+                            : idx < currentSection
+                            ? 'w-2 bg-[#8B7355]/50'
+                            : 'w-2 bg-[#E5E5E5]'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  <motion.button
+                    onClick={() => {
+                      if (currentSection < sections.length - 1) {
+                        setCurrentSection(currentSection + 1)
+                      } else {
+                        onClose()
+                      }
+                    }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full py-4 rounded-lg font-semibold text-white bg-[#8B7355] hover:bg-[#6F5D47] transition-all"
+                  >
+                    {currentSection < sections.length - 1 ? `Continue ${currentSection + 1}/${sections.length}` : "Thanks Kopi! 🤠"}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    )
+  }
+
+  // Original formatted display (fallback)
   const sections = [
     {
       title: 'greeting',

@@ -8,6 +8,7 @@ export async function POST(request: Request) {
     const {
       name,
       email,
+      password,
       riskProfile,
       experienceLevel,
       tradingCapital,
@@ -20,31 +21,39 @@ export async function POST(request: Request) {
     console.log('📝 Creating user with Supabase:', { name, email, riskProfile })
 
     // Validate required fields
-    if (!name || !email || !riskProfile) {
+    if (!name || !email || !password || !riskProfile) {
       return NextResponse.json(
-        { error: 'Missing required fields', message: 'Name, email, and risk profile are required' },
+        { error: 'Missing required fields', message: 'Name, email, password, and risk profile are required' },
         { status: 400 }
       )
     }
 
-    // Check if user already exists
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
-
-    if (existingUser) {
+    // Validate password strength
+    if (password.length < 6) {
       return NextResponse.json(
-        { 
-          error: 'Email already registered', 
-          message: 'This email is already associated with an account. Please use a different email.' 
-        },
+        { error: 'Weak password', message: 'Password must be at least 6 characters long' },
         { status: 400 }
       )
     }
 
-    // Create user
+    // Create Supabase Auth user first
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email for demo purposes
+    })
+
+    if (authError) {
+      console.error('❌ Error creating auth user:', authError)
+      return NextResponse.json(
+        { error: 'Failed to create account', message: authError.message },
+        { status: 400 }
+      )
+    }
+
+    console.log('✅ Auth user created:', authData.user.id)
+
+    // Create user profile in database
     // Map values to match database constraints
     const formatRiskProfile = (profile: string) => {
       return profile.charAt(0).toUpperCase() + profile.slice(1).toLowerCase()
@@ -53,6 +62,7 @@ export async function POST(request: Request) {
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .insert({
+        id: authData.user.id, // Use the auth user ID
         email,
         name,
         risk_profile: formatRiskProfile(riskProfile), // 'moderate' -> 'Moderate'
@@ -66,14 +76,16 @@ export async function POST(request: Request) {
       .single()
 
     if (userError) {
-      console.error('❌ Error creating user:', userError)
+      console.error('❌ Error creating user profile:', userError)
+      // Cleanup: delete the auth user if profile creation fails
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       return NextResponse.json(
-        { error: 'Failed to create user', message: userError.message },
+        { error: 'Failed to create user profile', message: userError.message },
         { status: 500 }
       )
     }
 
-    console.log('✅ User created:', user.id)
+    console.log('✅ User profile created:', user.id)
 
     // Add watchlist items if provided
     if (watchlist && watchlist.length > 0) {
@@ -121,18 +133,12 @@ export async function POST(request: Request) {
       console.log('✅ Watchlist items added')
     }
 
-    // Set user ID in a cookie
+    console.log('✅ Onboarding completed successfully for user:', user.id)
+
     const response = NextResponse.json({ 
       success: true, 
       userId: user.id,
       message: 'Onboarding completed successfully!' 
-    })
-
-    response.cookies.set('user_id', user.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
     })
 
     return response

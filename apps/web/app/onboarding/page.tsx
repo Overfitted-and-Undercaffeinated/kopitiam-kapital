@@ -17,6 +17,7 @@ type OnboardingStep = 1 | 2 | 3 | 4
 interface FormData {
   name: string
   email: string
+  password: string
   riskProfile: string
   experienceLevel: string
   tradingCapital: string
@@ -37,6 +38,7 @@ export default function OnboardingPage() {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
+    password: '',
     riskProfile: '',
     experienceLevel: '',
     tradingCapital: '',
@@ -130,15 +132,28 @@ export default function OnboardingPage() {
       // Show success message
       setKopiExpression('happy')
       
-      // Store user ID in localStorage for easy access
-      if (data.userId) {
-        localStorage.setItem('userId', data.userId)
-      }
+      // Automatically sign in the user with their credentials
+      const { createClient } = await import('@/lib/supabase')
+      const supabase = createClient()
       
-      // Redirect to dashboard after a short delay
-      setTimeout(() => {
-        window.location.href = '/dashboard'
-      }, 1000)
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (signInError) {
+        console.error('❌ Auto-signin error:', signInError)
+        // Fallback: redirect to login page
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1000)
+      } else {
+        console.log('✅ Auto-signin successful:', signInData)
+        // Redirect to dashboard after successful auto-signin
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 1500) // Slightly longer to show the success state
+      }
       
     } catch (error: any) {
       console.error('❌ Onboarding error:', error)
@@ -152,7 +167,7 @@ export default function OnboardingPage() {
   const canProceed = () => {
     switch (step) {
       case 1:
-        return formData.name && formData.email && formData.riskProfile
+        return formData.name && formData.email && formData.password && formData.riskProfile && formData.password.length >= 6
       case 2:
         return formData.experienceLevel && formData.tradingCapital
       case 3:
@@ -299,9 +314,28 @@ export default function OnboardingPage() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => updateFormData('email', e.target.value)}
-                      className="w-full px-6 py-5 rounded-2xl border-3 border-[#CD853F] bg-white text-[#2F1810] text-xl font-semibold focus:outline-none focus:border-[#D2691E] focus:ring-4 focus:ring-[#CD853F]/30 transition-all"
+                      className="w-full px-6 py-5 rounded-2xl border-3 border-[#CD853F] bg-white text-[#2F1810] text-xl font-semibold focus:outline-none focus:border-[#D2691E] focus:ring-4 focus:ring-[#CD853F]/30 transition-all shadow-lg"
                       placeholder="john@example.com"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xl font-bold text-[#8B4513] mb-3">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => updateFormData('password', e.target.value)}
+                      className="w-full px-6 py-5 rounded-2xl border-3 border-[#CD853F] bg-white text-[#2F1810] text-xl font-semibold focus:outline-none focus:border-[#D2691E] focus:ring-4 focus:ring-[#CD853F]/30 transition-all shadow-lg"
+                      placeholder="••••••••"
+                      minLength={6}
+                    />
+                    {formData.password && formData.password.length < 6 && (
+                      <p className="mt-2 text-sm text-red-600 font-semibold">
+                        Password must be at least 6 characters
+                      </p>
+                    )}
                   </div>
 
                   <div>
