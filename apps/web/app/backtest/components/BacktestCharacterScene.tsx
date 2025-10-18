@@ -1,501 +1,510 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import * as THREE from 'three'
+import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 
 interface BacktestCharacterSceneProps {
   isGoodResult: boolean // true = riding bull, false = fighting bear
 }
 
 export default function BacktestCharacterScene({ isGoodResult }: BacktestCharacterSceneProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [isAnimating, setIsAnimating] = useState(true)
 
   useEffect(() => {
-    if (!containerRef.current) return
-    if (typeof window === 'undefined') return
-
-    // Scene setup
-    const scene = new THREE.Scene()
-    scene.background = null
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000)
-    camera.position.set(0, 0, 8)
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ 
-      alpha: true, 
-      antialias: true 
-    })
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
-    containerRef.current.appendChild(renderer.domElement)
-
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
-    scene.add(ambientLight)
-
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1)
-    directionalLight1.position.set(5, 5, 5)
-    scene.add(directionalLight1)
-
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5)
-    directionalLight2.position.set(-5, 5, -5)
-    scene.add(directionalLight2)
-
-    // Main group for the entire scene
-    const mainGroup = new THREE.Group()
-
-    // Create Kopikolt character
-    const createKopikolt = () => {
-      const cowboyGroup = new THREE.Group()
-      const headGroup = new THREE.Group()
-
-      // Colors
-      const skinColor = 0xFFB38A
-      const hairColor = 0x4A3728
-      const hatColor = 0xA67C52
-      const hatBrimColor = 0x8B6F47
-      const hatBandColor = 0x5C4033
-      const shirtColor = 0x3498DB
-      const vestColor = 0x8B7355
-      const eyeWhite = 0xFFFFFF
-      const eyeColor = 0x2C3E50
-      const eyebrowColor = 0x2F1810
-
-      // HEAD
-      const headGeometry = new THREE.SphereGeometry(0.7, 32, 32)
-      const headMaterial = new THREE.MeshToonMaterial({ color: skinColor })
-      const head = new THREE.Mesh(headGeometry, headMaterial)
-      head.scale.set(1, 1.05, 0.9)
-      headGroup.add(head)
-
-      // COWBOY HAT
-      const hatBrimGeometry = new THREE.CylinderGeometry(1.1, 1.3, 0.1, 32)
-      const hatBrimMaterial = new THREE.MeshToonMaterial({ color: hatBrimColor })
-      const hatBrim = new THREE.Mesh(hatBrimGeometry, hatBrimMaterial)
-      hatBrim.position.y = 0.75
-      headGroup.add(hatBrim)
-
-      const hatCrownBaseGeometry = new THREE.CylinderGeometry(0.75, 0.77, 0.2, 32)
-      const hatCrownBaseMaterial = new THREE.MeshToonMaterial({ color: hatColor })
-      const hatCrownBase = new THREE.Mesh(hatCrownBaseGeometry, hatCrownBaseMaterial)
-      hatCrownBase.position.y = 0.85
-      headGroup.add(hatCrownBase)
-
-      const hatCrownGeometry = new THREE.CylinderGeometry(0.6, 0.75, 1.0, 32)
-      const hatCrown = new THREE.Mesh(hatCrownGeometry, hatCrownBaseMaterial)
-      hatCrown.position.y = 1.4
-      headGroup.add(hatCrown)
-
-      const hatBandGeometry = new THREE.CylinderGeometry(0.77, 0.77, 0.15, 32)
-      const hatBandMaterial = new THREE.MeshToonMaterial({ color: hatBandColor })
-      const hatBand = new THREE.Mesh(hatBandGeometry, hatBandMaterial)
-      hatBand.position.y = 0.95
-      headGroup.add(hatBand)
-
-      // EYES
-      const eyeWhiteGeometry = new THREE.SphereGeometry(0.15, 16, 16)
-      const eyeWhiteMaterial = new THREE.MeshToonMaterial({ color: eyeWhite })
-      
-      const leftEyeWhite = new THREE.Mesh(eyeWhiteGeometry, eyeWhiteMaterial)
-      leftEyeWhite.position.set(-0.25, 0.2, 0.6)
-      leftEyeWhite.scale.set(1.3, 1.4, 0.5) // Excited expression
-      headGroup.add(leftEyeWhite)
-
-      const rightEyeWhite = new THREE.Mesh(eyeWhiteGeometry, eyeWhiteMaterial)
-      rightEyeWhite.position.set(0.25, 0.2, 0.6)
-      rightEyeWhite.scale.set(1.3, 1.4, 0.5)
-      headGroup.add(rightEyeWhite)
-
-      // Pupils
-      const pupilGeometry = new THREE.SphereGeometry(0.1, 16, 16)
-      const pupilMaterial = new THREE.MeshToonMaterial({ color: eyeColor })
-      
-      const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial)
-      leftPupil.position.set(-0.25, 0.2, 0.65)
-      leftPupil.scale.set(0.8, 0.9, 0.5)
-      headGroup.add(leftPupil)
-
-      const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial)
-      rightPupil.position.set(0.25, 0.2, 0.65)
-      rightPupil.scale.set(0.8, 0.9, 0.5)
-      headGroup.add(rightPupil)
-
-      // Eye highlights
-      const highlightGeometry = new THREE.SphereGeometry(0.05, 8, 8)
-      const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF })
-      
-      const leftHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial)
-      leftHighlight.position.set(-0.22, 0.25, 0.68)
-      headGroup.add(leftHighlight)
-
-      const rightHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial)
-      rightHighlight.position.set(0.28, 0.25, 0.68)
-      headGroup.add(rightHighlight)
-
-      // EYEBROWS
-      const eyebrowGeometry = new THREE.BoxGeometry(0.2, 0.08, 0.05)
-      const eyebrowMaterial = new THREE.MeshToonMaterial({ color: eyebrowColor })
-      
-      const leftEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial)
-      leftEyebrow.position.set(-0.25, 0.4, 0.6)
-      leftEyebrow.rotation.z = isGoodResult ? -0.3 : -0.5 // Happy or determined
-      headGroup.add(leftEyebrow)
-
-      const rightEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial)
-      rightEyebrow.position.set(0.25, 0.4, 0.6)
-      rightEyebrow.rotation.z = isGoodResult ? 0.3 : 0.5
-      headGroup.add(rightEyebrow)
-
-      // MOUTH - Big smile for bull, determined for bear
-      const mouthGeometry = new THREE.TorusGeometry(0.18, 0.04, 8, 16, Math.PI)
-      const mouthMaterial = new THREE.MeshToonMaterial({ color: 0x5C3D2E })
-      const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial)
-      mouth.position.set(0, -0.05, 0.6)
-      mouth.rotation.z = Math.PI
-      mouth.scale.set(isGoodResult ? 1.2 : 0.9, 1, 1)
-      headGroup.add(mouth)
-
-      // NOSE
-      const noseGeometry = new THREE.SphereGeometry(0.08, 16, 16)
-      const noseMaterial = new THREE.MeshToonMaterial({ color: 0xE89B6F })
-      const nose = new THREE.Mesh(noseGeometry, noseMaterial)
-      nose.position.set(0, 0.1, 0.68)
-      nose.scale.set(0.8, 1, 1.2)
-      headGroup.add(nose)
-
-      // Hair
-      const hairGeometry = new THREE.SphereGeometry(0.15, 16, 16)
-      const hairMaterial = new THREE.MeshToonMaterial({ color: hairColor })
-      
-      const leftHair = new THREE.Mesh(hairGeometry, hairMaterial)
-      leftHair.position.set(-0.6, 0.5, 0.2)
-      leftHair.scale.set(0.6, 1, 0.8)
-      headGroup.add(leftHair)
-
-      const rightHair = new THREE.Mesh(hairGeometry, hairMaterial)
-      rightHair.position.set(0.6, 0.5, 0.2)
-      rightHair.scale.set(0.6, 1, 0.8)
-      headGroup.add(rightHair)
-
-      cowboyGroup.add(headGroup)
-
-      // BODY
-      const bodyGeometry = new THREE.BoxGeometry(0.8, 1.0, 0.5)
-      const bodyMaterial = new THREE.MeshToonMaterial({ color: shirtColor })
-      const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-      body.position.y = -1.2
-      cowboyGroup.add(body)
-
-      // VEST
-      const vestGeometry = new THREE.BoxGeometry(0.85, 0.9, 0.52)
-      const vestMaterial = new THREE.MeshToonMaterial({ color: vestColor })
-      const vest = new THREE.Mesh(vestGeometry, vestMaterial)
-      vest.position.y = -1.15
-      cowboyGroup.add(vest)
-
-      // ARMS
-      const armGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.7, 16)
-      const armMaterial = new THREE.MeshToonMaterial({ color: shirtColor })
-      
-      const leftArm = new THREE.Mesh(armGeometry, armMaterial)
-      if (isGoodResult) {
-        // Riding pose - one arm up celebrating
-        leftArm.position.set(-0.55, -0.8, 0)
-        leftArm.rotation.z = 0.8
-      } else {
-        // Fighting pose - arms in fighting position
-        leftArm.position.set(-0.55, -1.0, 0.3)
-        leftArm.rotation.z = 0.6
-      }
-      cowboyGroup.add(leftArm)
-
-      const rightArm = new THREE.Mesh(armGeometry, armMaterial)
-      if (isGoodResult) {
-        // Riding pose - holding reins
-        rightArm.position.set(0.55, -1.2, 0)
-        rightArm.rotation.z = -0.3
-      } else {
-        // Fighting pose
-        rightArm.position.set(0.55, -1.0, 0.3)
-        rightArm.rotation.z = -0.6
-      }
-      cowboyGroup.add(rightArm)
-
-      // HANDS
-      const handGeometry = new THREE.SphereGeometry(0.15, 16, 16)
-      const handMaterial = new THREE.MeshToonMaterial({ color: skinColor })
-      
-      const leftHand = new THREE.Mesh(handGeometry, handMaterial)
-      leftHand.position.set(isGoodResult ? -0.75 : -0.75, isGoodResult ? -0.45 : -1.35, isGoodResult ? 0 : 0.3)
-      leftHand.scale.set(1, 1.2, 0.8)
-      cowboyGroup.add(leftHand)
-
-      const rightHand = new THREE.Mesh(handGeometry, handMaterial)
-      rightHand.position.set(isGoodResult ? 0.75 : 0.75, isGoodResult ? -1.5 : -1.35, isGoodResult ? 0 : 0.3)
-      rightHand.scale.set(1, 1.2, 0.8)
-      cowboyGroup.add(rightHand)
-
-      // BANDANA
-      const bandanaGeometry = new THREE.ConeGeometry(0.2, 0.3, 3)
-      const bandanaMaterial = new THREE.MeshToonMaterial({ color: 0xE74C3C })
-      const bandana = new THREE.Mesh(bandanaGeometry, bandanaMaterial)
-      bandana.position.set(0, -0.6, 0.2)
-      bandana.rotation.x = Math.PI
-      cowboyGroup.add(bandana)
-
-      return cowboyGroup
-    }
-
-    // Create BULL (for good results)
-    const createBull = () => {
-      const bullGroup = new THREE.Group()
-      
-      // Bull colors
-      const bullBodyColor = 0x654321 // Brown
-      const bullHornColor = 0xF5F5DC // Beige
-
-      // BODY
-      const bodyGeometry = new THREE.BoxGeometry(2, 1.2, 1.5)
-      const bodyMaterial = new THREE.MeshToonMaterial({ color: bullBodyColor })
-      const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-      body.position.set(0, -2.5, 0)
-      bullGroup.add(body)
-
-      // HEAD
-      const headGeometry = new THREE.BoxGeometry(1, 0.8, 0.8)
-      const head = new THREE.Mesh(headGeometry, bodyMaterial)
-      head.position.set(0, -2.2, 1.3)
-      bullGroup.add(head)
-
-      // HORNS
-      const hornGeometry = new THREE.ConeGeometry(0.1, 0.6, 8)
-      const hornMaterial = new THREE.MeshToonMaterial({ color: bullHornColor })
-      
-      const leftHorn = new THREE.Mesh(hornGeometry, hornMaterial)
-      leftHorn.position.set(-0.4, -1.8, 1.3)
-      leftHorn.rotation.z = -0.5
-      bullGroup.add(leftHorn)
-
-      const rightHorn = new THREE.Mesh(hornGeometry, hornMaterial)
-      rightHorn.position.set(0.4, -1.8, 1.3)
-      rightHorn.rotation.z = 0.5
-      bullGroup.add(rightHorn)
-
-      // EYES
-      const eyeGeometry = new THREE.SphereGeometry(0.08, 16, 16)
-      const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 })
-      
-      const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
-      leftEye.position.set(-0.25, -2.1, 1.7)
-      bullGroup.add(leftEye)
-
-      const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
-      rightEye.position.set(0.25, -2.1, 1.7)
-      bullGroup.add(rightEye)
-
-      // LEGS
-      const legGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8)
-      
-      const frontLeftLeg = new THREE.Mesh(legGeometry, bodyMaterial)
-      frontLeftLeg.position.set(-0.6, -3.2, 0.6)
-      bullGroup.add(frontLeftLeg)
-
-      const frontRightLeg = new THREE.Mesh(legGeometry, bodyMaterial)
-      frontRightLeg.position.set(0.6, -3.2, 0.6)
-      bullGroup.add(frontRightLeg)
-
-      const backLeftLeg = new THREE.Mesh(legGeometry, bodyMaterial)
-      backLeftLeg.position.set(-0.6, -3.2, -0.6)
-      bullGroup.add(backLeftLeg)
-
-      const backRightLeg = new THREE.Mesh(legGeometry, bodyMaterial)
-      backRightLeg.position.set(0.6, -3.2, -0.6)
-      bullGroup.add(backRightLeg)
-
-      // TAIL
-      const tailGeometry = new THREE.CylinderGeometry(0.05, 0.08, 0.8, 8)
-      const tail = new THREE.Mesh(tailGeometry, bodyMaterial)
-      tail.position.set(0, -2.3, -0.8)
-      tail.rotation.x = Math.PI / 4
-      bullGroup.add(tail)
-
-      return bullGroup
-    }
-
-    // Create BEAR (for bad results)
-    const createBear = () => {
-      const bearGroup = new THREE.Group()
-      
-      // Bear colors
-      const bearBodyColor = 0x5C4033 // Dark brown
-      const bearFaceColor = 0x8B7355 // Lighter brown
-
-      // BODY
-      const bodyGeometry = new THREE.SphereGeometry(1, 32, 32)
-      const bodyMaterial = new THREE.MeshToonMaterial({ color: bearBodyColor })
-      const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-      body.scale.set(1, 1.3, 0.9)
-      body.position.set(0, -2.5, 0)
-      bearGroup.add(body)
-
-      // HEAD
-      const headGeometry = new THREE.SphereGeometry(0.6, 32, 32)
-      const head = new THREE.Mesh(headGeometry, bodyMaterial)
-      head.position.set(0, -1.2, 0.5)
-      bearGroup.add(head)
-
-      // SNOUT
-      const snoutGeometry = new THREE.SphereGeometry(0.3, 16, 16)
-      const snoutMaterial = new THREE.MeshToonMaterial({ color: bearFaceColor })
-      const snout = new THREE.Mesh(snoutGeometry, snoutMaterial)
-      snout.position.set(0, -1.3, 1.0)
-      snout.scale.set(0.8, 0.7, 1.2)
-      bearGroup.add(snout)
-
-      // EARS
-      const earGeometry = new THREE.SphereGeometry(0.2, 16, 16)
-      
-      const leftEar = new THREE.Mesh(earGeometry, bodyMaterial)
-      leftEar.position.set(-0.4, -0.8, 0.5)
-      bearGroup.add(leftEar)
-
-      const rightEar = new THREE.Mesh(earGeometry, bodyMaterial)
-      rightEar.position.set(0.4, -0.8, 0.5)
-      bearGroup.add(rightEar)
-
-      // EYES - Angry/fierce
-      const eyeGeometry = new THREE.SphereGeometry(0.08, 16, 16)
-      const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000 }) // Red eyes for fierce
-      
-      const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
-      leftEye.position.set(-0.2, -1.1, 0.85)
-      bearGroup.add(leftEye)
-
-      const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
-      rightEye.position.set(0.2, -1.1, 0.85)
-      bearGroup.add(rightEye)
-
-      // MOUTH - Angry growl
-      const mouthGeometry = new THREE.TorusGeometry(0.12, 0.03, 8, 16, Math.PI)
-      const mouthMaterial = new THREE.MeshToonMaterial({ color: 0x000000 })
-      const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial)
-      mouth.position.set(0, -1.4, 1.05)
-      mouth.rotation.z = 0 // Frown
-      bearGroup.add(mouth)
-
-      // ARMS - Raised in fighting pose
-      const armGeometry = new THREE.CylinderGeometry(0.2, 0.15, 1, 16)
-      
-      const leftArm = new THREE.Mesh(armGeometry, bodyMaterial)
-      leftArm.position.set(-0.9, -1.8, 0.3)
-      leftArm.rotation.z = 0.8
-      bearGroup.add(leftArm)
-
-      const rightArm = new THREE.Mesh(armGeometry, bodyMaterial)
-      rightArm.position.set(0.9, -1.8, 0.3)
-      rightArm.rotation.z = -0.8
-      bearGroup.add(rightArm)
-
-      // PAWS with claws
-      const pawGeometry = new THREE.SphereGeometry(0.2, 16, 16)
-      
-      const leftPaw = new THREE.Mesh(pawGeometry, bodyMaterial)
-      leftPaw.position.set(-1.2, -1.3, 0.4)
-      bearGroup.add(leftPaw)
-
-      const rightPaw = new THREE.Mesh(pawGeometry, bodyMaterial)
-      rightPaw.position.set(1.2, -1.3, 0.4)
-      bearGroup.add(rightPaw)
-
-      // LEGS
-      const legGeometry = new THREE.CylinderGeometry(0.25, 0.2, 0.8, 16)
-      
-      const leftLeg = new THREE.Mesh(legGeometry, bodyMaterial)
-      leftLeg.position.set(-0.5, -3.4, 0)
-      bearGroup.add(leftLeg)
-
-      const rightLeg = new THREE.Mesh(legGeometry, bodyMaterial)
-      rightLeg.position.set(0.5, -3.4, 0)
-      bearGroup.add(rightLeg)
-
-      return bearGroup
-    }
-
-    // Create the scene based on result
-    const kopikolt = createKopikolt()
-    kopikolt.scale.set(0.6, 0.6, 0.6)
-    
-    if (isGoodResult) {
-      // Riding the bull
-      const bull = createBull()
-      kopikolt.position.set(0, 1.5, 0)
-      mainGroup.add(bull)
-      mainGroup.add(kopikolt)
-    } else {
-      // Fighting the bear
-      const bear = createBear()
-      bear.position.set(1.5, 0, 0) // Bear to the right
-      kopikolt.position.set(-1, 0, 0.5) // Kopikolt to the left, facing bear
-      kopikolt.rotation.y = 0.5 // Turn towards bear
-      mainGroup.add(bear)
-      mainGroup.add(kopikolt)
-    }
-
-    scene.add(mainGroup)
-
-    // Animation
-    const clock = new THREE.Clock()
-    const animate = () => {
-      requestAnimationFrame(animate)
-      const time = clock.getElapsedTime()
-
-      if (isGoodResult) {
-        // Bull riding motion - bouncing up and down
-        mainGroup.position.y = Math.sin(time * 2) * 0.3
-        mainGroup.rotation.y = Math.sin(time * 0.5) * 0.1
-      } else {
-        // Fighting motion - slight sway
-        mainGroup.rotation.y = Math.sin(time * 1.5) * 0.05
-      }
-
-      renderer.render(scene, camera)
-    }
-
-    animate()
-
-    // Handle resize
-    const handleResize = () => {
-      if (!containerRef.current) return
-      const width = containerRef.current.clientWidth
-      const height = containerRef.current.clientHeight
-      camera.aspect = width / height
-      camera.updateProjectionMatrix()
-      renderer.setSize(width, height)
-    }
-
-    window.addEventListener('resize', handleResize)
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
-        containerRef.current.removeChild(renderer.domElement)
-      }
-      renderer.dispose()
-    }
+    // Reset animation when mode changes
+    setIsAnimating(false)
+    const timer = setTimeout(() => setIsAnimating(true), 50)
+    return () => clearTimeout(timer)
   }, [isGoodResult])
 
   return (
-    <div 
-      ref={containerRef} 
-      style={{ 
-        width: '100%', 
-        height: '100%',
-        minHeight: '400px'
-      }} 
-    />
+    <div className="w-full h-full flex items-center justify-center overflow-hidden relative">
+      {isGoodResult ? <BullRideScene isAnimating={isAnimating} /> : <BearFightScene isAnimating={isAnimating} />}
+    </div>
   )
 }
 
+// Bull Riding Scene - Duolingo style with ORIGINAL Kopikolt
+function BullRideScene({ isAnimating }: { isAnimating: boolean }) {
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      {/* Background elements */}
+      <div className="absolute inset-0 flex items-end justify-center pb-8">
+        {/* Ground */}
+        <div className="w-full h-24 bg-gradient-to-b from-[#8B7355] to-[#6B5345] rounded-t-full" />
+      </div>
+
+      {/* Confetti */}
+      <div className="absolute inset-0">
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-3 h-3 rounded-full animate-confetti"
+            style={{
+              left: `${10 + i * 7}%`,
+              top: `${20 + (i % 3) * 10}%`,
+              backgroundColor: ['#FFD700', '#FF6B6B', '#4ECDC4', '#95E1D3'][i % 4],
+              animationDelay: `${i * 0.15}s`,
+              animationDuration: `${2 + (i % 3) * 0.5}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Main scene */}
+      <div className={`relative z-10 ${isAnimating ? 'animate-float' : ''}`}>
+        {/* Bull */}
+        <div className="relative">
+          <BullSVG className="w-96 h-80" />
+        </div>
+
+        {/* Kopikolt character riding the bull - much higher position */}
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
+          <KopikoltSVG 
+            className="w-40 h-48" 
+            expression="happy"
+          />
+        </div>
+      </div>
+
+      {/* Success text */}
+      <div className="absolute bottom-8 text-center animate-pulse-soft">
+        <div className="text-4xl font-bold text-green-600 drop-shadow-lg">
+          📈 Success!
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Bear Fighting Scene - Duolingo style with ORIGINAL Kopikolt
+function BearFightScene({ isAnimating }: { isAnimating: boolean }) {
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      {/* Background elements */}
+      <div className="absolute inset-0 flex items-end justify-center pb-8">
+        {/* Ground */}
+        <div className="w-full h-24 bg-gradient-to-b from-[#8B7355] to-[#6B5345] rounded-t-full" />
+      </div>
+
+      {/* Lightning effects */}
+      <div className="absolute inset-0">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-16 bg-yellow-400 animate-lightning"
+            style={{
+              left: `${30 + i * 40}%`,
+              top: `${10 + i * 20}%`,
+              animationDelay: `${i * 0.8}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Main scene */}
+      <div className="relative z-10 flex items-center gap-8">
+        {/* Kopikolt in fighting stance */}
+        <div className={`${isAnimating ? 'animate-battle-stance' : ''}`}>
+          <KopikoltSVG 
+            className="w-40 h-48" 
+            expression="concerned"
+          />
+        </div>
+
+        {/* VS symbol */}
+        <div className="text-6xl font-bold text-red-600 animate-pulse-soft drop-shadow-lg">
+          ⚔️
+        </div>
+
+        {/* Bear */}
+        <div className={`${isAnimating ? 'animate-battle-stance-reverse' : ''}`}>
+          <BearSVG className="w-48 h-48" />
+        </div>
+      </div>
+
+      {/* Challenge text */}
+      <div className="absolute bottom-8 text-center animate-pulse-soft">
+        <div className="text-4xl font-bold text-red-600 drop-shadow-lg">
+          💪 Keep Fighting!
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ORIGINAL Kopikolt SVG from KopiColt2D.tsx - Preserved authentic design
+function KopikoltSVG({ className, expression }: { className?: string; expression: 'happy' | 'concerned' | 'neutral' | 'impressed' }) {
+  const getEyeExpression = () => {
+    switch (expression) {
+      case 'happy':
+        return { eyebrowRotate: -12, mouthCurve: 25 }
+      case 'concerned':
+        return { eyebrowRotate: 8, mouthCurve: -15 }
+      case 'impressed':
+        return { eyebrowRotate: -10, mouthCurve: 18 }
+      default:
+        return { eyebrowRotate: -8, mouthCurve: 15 }
+    }
+  }
+
+  const eyeExpr = getEyeExpression()
+
+  return (
+    <svg className={className} viewBox="0 0 200 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Body - rounded rectangle */}
+      <rect x="55" y="150" width="90" height="65" rx="20" fill="#5C4033" stroke="#3D2B22" strokeWidth="3" />
+      
+      {/* Left Arm - animated waving */}
+      <motion.path 
+        d="M 60 160 L 40 175 L 35 190 L 42 192 L 50 180 L 65 170 Z" 
+        fill="#FFB38A" 
+        stroke="#E8A07C" 
+        strokeWidth="2.5"
+        animate={{ 
+          rotate: [0, -5, 0]
+        }}
+        transition={{
+          duration: 2.5,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        style={{ transformOrigin: '60px 160px' }}
+      />
+      
+      {/* Right Arm - animated waving */}
+      <motion.path 
+        d="M 140 160 L 160 175 L 165 190 L 158 192 L 150 180 L 135 170 Z" 
+        fill="#FFB38A" 
+        stroke="#E8A07C" 
+        strokeWidth="2.5"
+        animate={{ 
+          rotate: [0, 5, 0]
+        }}
+        transition={{
+          duration: 2.5,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 0.3
+        }}
+        style={{ transformOrigin: '140px 160px' }}
+      />
+      
+      {/* Vest */}
+      <path 
+        d="M 70 155 L 75 175 L 85 205 L 115 205 L 125 175 L 130 155 L 100 160 Z" 
+        fill="#8B6F47" 
+        stroke="#6B5437" 
+        strokeWidth="2.5"
+      />
+      
+      {/* Vest buttons */}
+      <circle cx="100" cy="170" r="3" fill="#FFD700" />
+      <circle cx="100" cy="185" r="3" fill="#FFD700" />
+      
+      {/* Bandana */}
+      <path 
+        d="M 85 138 L 100 148 L 115 138 L 110 150 L 90 150 Z" 
+        fill="#DC143C" 
+        stroke="#B01030" 
+        strokeWidth="2.5"
+      />
+      
+      {/* Neck */}
+      <rect x="85" y="130" width="30" height="18" rx="5" fill="#FFB38A" />
+      
+      {/* Head - with subtle tilt animation */}
+      <motion.rect 
+        x="60" 
+        y="55" 
+        width="80" 
+        height="85" 
+        rx="25" 
+        fill="#FFB38A" 
+        stroke="#E8A07C" 
+        strokeWidth="3"
+        animate={{ 
+          rotate: [-2, 2, -2]
+        }}
+        transition={{
+          duration: 3,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        style={{ transformOrigin: '100px 97.5px' }}
+      />
+      
+      {/* Ears */}
+      <rect x="50" y="85" width="12" height="20" rx="6" fill="#FFB38A" stroke="#E8A07C" strokeWidth="2" />
+      <rect x="138" y="85" width="12" height="20" rx="6" fill="#FFB38A" stroke="#E8A07C" strokeWidth="2" />
+      
+      {/* Hat brim */}
+      <ellipse cx="100" cy="58" rx="68" ry="10" fill="#8B7355" stroke="#6B5937" strokeWidth="3" />
+      {/* Hat crown */}
+      <path 
+        d="M 65 55 L 62 25 Q 62 15 72 15 L 128 15 Q 138 15 138 25 L 135 55 Z" 
+        fill="#A0826D" 
+        stroke="#80694D" 
+        strokeWidth="3"
+      />
+      {/* Hat top crease */}
+      <path 
+        d="M 75 25 Q 100 20 125 25" 
+        stroke="#80694D" 
+        strokeWidth="2" 
+        fill="none"
+      />
+      {/* Hat band */}
+      <rect x="64" y="50" width="72" height="8" rx="2" fill="#654321" stroke="#452F18" strokeWidth="2" />
+      
+      {/* Hair peeks */}
+      <path d="M 62 62 L 55 70 L 60 75 L 68 68 Z" fill="#4A3728" stroke="#3A2718" strokeWidth="2" />
+      <path d="M 138 62 L 145 70 L 140 75 L 132 68 Z" fill="#4A3728" stroke="#3A2718" strokeWidth="2" />
+      
+      {/* Eyes - Duolingo style */}
+      <g>
+        {/* Left eye */}
+        <path
+          d="M 68 98 L 68 103 L 88 103 L 88 98 Q 88 90 78 90 Q 68 90 68 98 Z"
+          fill="white"
+          stroke="#2C1810"
+          strokeWidth="2.5"
+        />
+        <ellipse cx="78" cy="98" rx="5" ry="6" fill="#2C1810" />
+        <ellipse cx="79" cy="96" rx="2" ry="2.5" fill="white" />
+        
+        {/* Right eye */}
+        <path
+          d="M 112 98 L 112 103 L 132 103 L 132 98 Q 132 90 122 90 Q 112 90 112 98 Z"
+          fill="white"
+          stroke="#2C1810"
+          strokeWidth="2.5"
+        />
+        <ellipse cx="122" cy="98" rx="5" ry="6" fill="#2C1810" />
+        <ellipse cx="123" cy="96" rx="2" ry="2.5" fill="white" />
+      </g>
+      
+      {/* Eyebrows - animated based on expression */}
+      <motion.rect 
+        x="68" 
+        y="88" 
+        width="22" 
+        height="6" 
+        rx="3" 
+        fill="#654321"
+        animate={{ rotate: eyeExpr.eyebrowRotate }}
+        style={{ transformOrigin: '79px 91px' }}
+      />
+      <motion.rect 
+        x="110" 
+        y="88" 
+        width="22" 
+        height="6" 
+        rx="3" 
+        fill="#654321"
+        animate={{ rotate: -eyeExpr.eyebrowRotate }}
+        style={{ transformOrigin: '121px 91px' }}
+      />
+      
+      {/* Nose */}
+      <path d="M 100 108 L 95 118 L 105 118 Z" fill="#E8A07C" />
+      
+      {/* Mouth - changes with expression */}
+      {expression === 'happy' && (
+        <path d="M 80 120 Q 100 135 120 120" stroke="#654321" strokeWidth="4" fill="none" strokeLinecap="round" />
+      )}
+      {expression === 'concerned' && (
+        <path d="M 80 130 Q 100 120 120 130" stroke="#654321" strokeWidth="4" fill="none" strokeLinecap="round" />
+      )}
+      {expression === 'impressed' && (
+        <path d="M 83 122 Q 100 132 117 122" stroke="#654321" strokeWidth="4" fill="none" strokeLinecap="round" />
+      )}
+      {expression === 'neutral' && (
+        <path d="M 85 122 Q 100 130 115 122" stroke="#654321" strokeWidth="4" fill="none" strokeLinecap="round" />
+      )}
+    </svg>
+  )
+}
+
+// Bull SVG - More realistic, muscular bull
+function BullSVG({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 140 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g className="animate-bounce-subtle">
+        {/* Back legs */}
+        <g>
+          <path d="M 85 80 L 88 95 L 92 95 L 89 80 Z" fill="#654321" stroke="#4A3219" strokeWidth="2" />
+          <path d="M 100 80 L 103 95 L 107 95 L 104 80 Z" fill="#654321" stroke="#4A3219" strokeWidth="2" />
+          {/* Hooves */}
+          <ellipse cx="90" cy="95" rx="4" ry="2" fill="#2F1810" />
+          <ellipse cx="105" cy="95" rx="4" ry="2" fill="#2F1810" />
+        </g>
+        
+        {/* Main body - muscular, realistic shape */}
+        <ellipse cx="70" cy="58" rx="42" ry="30" fill="#8B6F47" />
+        <ellipse cx="70" cy="58" rx="38" ry="26" fill="#A0826D" opacity="0.6" />
+        
+        {/* Muscular shoulder hump */}
+        <path 
+          d="M 40 45 Q 50 35 65 40 Q 75 43 78 50 Q 75 55 70 58 Q 60 58 50 55 Q 42 52 40 45 Z" 
+          fill="#9B7653" 
+          stroke="#7A5C3F" 
+          strokeWidth="2"
+        />
+        
+        {/* Chest/shoulder muscles */}
+        <ellipse cx="45" cy="50" rx="12" ry="15" fill="#8B6F47" opacity="0.7" />
+        
+        {/* Belly/underbelly - lighter color */}
+        <ellipse cx="75" cy="68" rx="28" ry="18" fill="#C4A57B" opacity="0.5" />
+        
+        {/* Bull neck - thick and muscular */}
+        <path 
+          d="M 50 52 Q 48 48 45 45 L 40 48 Q 42 54 48 56 Z" 
+          fill="#9B7653" 
+          stroke="#7A5C3F" 
+          strokeWidth="2"
+        />
+        
+        {/* Bull head - more angular and realistic */}
+        <ellipse cx="32" cy="48" rx="15" ry="18" fill="#A0826D" />
+        <path d="M 25 55 Q 28 62 35 62 Q 38 58 36 52 Z" fill="#8B6F47" />
+        
+        {/* Powerful horns - larger, curved upward */}
+        <path 
+          d="M 22 38 Q 18 28 14 30 Q 12 34 16 38 Q 20 40 22 38 Z" 
+          fill="#F5F5DC" 
+          stroke="#D4D4A8" 
+          strokeWidth="2.5"
+        />
+        <path 
+          d="M 38 38 Q 42 28 46 30 Q 48 34 44 38 Q 40 40 38 38 Z" 
+          fill="#F5F5DC" 
+          stroke="#D4D4A8" 
+          strokeWidth="2.5"
+        />
+        
+        {/* Horn tips - dark */}
+        <ellipse cx="14" cy="30" rx="2" ry="3" fill="#4A3219" />
+        <ellipse cx="46" cy="30" rx="2" ry="3" fill="#4A3219" />
+        
+        {/* Ears */}
+        <ellipse cx="24" cy="42" rx="5" ry="7" fill="#8B6F47" stroke="#7A5C3F" strokeWidth="1.5" />
+        <ellipse cx="40" cy="42" rx="5" ry="7" fill="#8B6F47" stroke="#7A5C3F" strokeWidth="1.5" />
+        
+        {/* Eyes - determined look */}
+        <ellipse cx="26" cy="46" rx="4" ry="5" fill="white" stroke="#2F1810" strokeWidth="1.5" />
+        <ellipse cx="38" cy="46" rx="4" ry="5" fill="white" stroke="#2F1810" strokeWidth="1.5" />
+        <circle cx="26" cy="47" r="2.5" fill="#2F1810" />
+        <circle cx="38" cy="47" r="2.5" fill="#2F1810" />
+        <circle cx="27" cy="46" r="1" fill="white" />
+        <circle cx="39" cy="46" r="1" fill="white" />
+        
+        {/* Nostrils - flared */}
+        <ellipse cx="28" cy="58" rx="2.5" ry="3" fill="#4A3219" />
+        <ellipse cx="36" cy="58" rx="2.5" ry="3" fill="#4A3219" />
+        
+        {/* Nose ring - gold */}
+        <ellipse cx="32" cy="60" rx="5" ry="4" fill="none" stroke="#FFD700" strokeWidth="2.5" />
+        <circle cx="32" cy="56" r="2" fill="#FFD700" />
+        
+        {/* Front legs - muscular */}
+        <g>
+          <path d="M 48 75 L 50 95 L 55 95 L 53 75 Z" fill="#8B6F47" stroke="#7A5C3F" strokeWidth="2" />
+          <path d="M 62 75 L 64 95 L 69 95 L 67 75 Z" fill="#8B6F47" stroke="#7A5C3F" strokeWidth="2" />
+          {/* Knee joints */}
+          <circle cx="51" cy="85" r="4" fill="#7A5C3F" />
+          <circle cx="65" cy="85" r="4" fill="#7A5C3F" />
+          {/* Hooves */}
+          <ellipse cx="52.5" cy="95" rx="4.5" ry="2.5" fill="#2F1810" />
+          <ellipse cx="66.5" cy="95" rx="4.5" ry="2.5" fill="#2F1810" />
+        </g>
+        
+        {/* Tail - dynamic, swishing */}
+        <motion.path 
+          d="M 108 55 Q 118 50 122 58 Q 124 65 120 68" 
+          stroke="#654321" 
+          strokeWidth="4" 
+          strokeLinecap="round" 
+          fill="none"
+          animate={{
+            d: [
+              "M 108 55 Q 118 50 122 58 Q 124 65 120 68",
+              "M 108 55 Q 118 48 124 54 Q 126 62 122 66",
+              "M 108 55 Q 118 50 122 58 Q 124 65 120 68"
+            ]
+          }}
+          transition={{
+            duration: 1.5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        {/* Tail tuft */}
+        <circle cx="120" cy="68" r="5" fill="#4A3219" />
+        <circle cx="122" cy="70" r="4" fill="#4A3219" />
+        
+        {/* Muscle definition lines */}
+        <path d="M 65 45 Q 70 48 72 52" stroke="#7A5C3F" strokeWidth="1.5" fill="none" opacity="0.5" />
+        <path d="M 78 52 Q 82 55 85 60" stroke="#7A5C3F" strokeWidth="1.5" fill="none" opacity="0.5" />
+        <path d="M 52 62 Q 58 65 62 68" stroke="#7A5C3F" strokeWidth="1.5" fill="none" opacity="0.5" />
+      </g>
+    </svg>
+  )
+}
+
+// Bear SVG - Duolingo style
+function BearSVG({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g className="animate-bounce-subtle-reverse">
+        {/* Bear body */}
+        <ellipse cx="50" cy="65" rx="32" ry="28" fill="#8B4513" />
+        
+        {/* Bear head */}
+        <circle cx="50" cy="45" r="24" fill="#A0522D" />
+        
+        {/* Ears */}
+        <circle cx="35" cy="30" r="10" fill="#8B4513" />
+        <circle cx="65" cy="30" r="10" fill="#8B4513" />
+        <circle cx="35" cy="32" r="6" fill="#D2691E" />
+        <circle cx="65" cy="32" r="6" fill="#D2691E" />
+        
+        {/* Eyes - angry */}
+        <circle cx="42" cy="42" r="4" fill="#2F1810" />
+        <circle cx="58" cy="42" r="4" fill="#2F1810" />
+        <circle cx="43" cy="41" r="1.5" fill="white" />
+        <circle cx="59" cy="41" r="1.5" fill="white" />
+        
+        {/* Angry eyebrows */}
+        <path d="M38 38 L46 36" stroke="#2F1810" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M62 38 L54 36" stroke="#2F1810" strokeWidth="2.5" strokeLinecap="round" />
+        
+        {/* Snout */}
+        <ellipse cx="50" cy="52" rx="10" ry="8" fill="#D2691E" />
+        <ellipse cx="50" cy="50" rx="4" ry="3" fill="#2F1810" />
+        
+        {/* Teeth */}
+        <path d="M45 57 L47 60" stroke="white" strokeWidth="2" strokeLinecap="round" />
+        <path d="M55 57 L53 60" stroke="white" strokeWidth="2" strokeLinecap="round" />
+        
+        {/* Claws */}
+        <g transform="translate(20, 60)">
+          <path d="M0 0 L-3 8" stroke="#2F1810" strokeWidth="2" strokeLinecap="round" />
+          <path d="M4 0 L1 8" stroke="#2F1810" strokeWidth="2" strokeLinecap="round" />
+          <path d="M8 0 L5 8" stroke="#2F1810" strokeWidth="2" strokeLinecap="round" />
+        </g>
+        
+        <g transform="translate(70, 60)">
+          <path d="M0 0 L3 8" stroke="#2F1810" strokeWidth="2" strokeLinecap="round" />
+          <path d="M4 0 L7 8" stroke="#2F1810" strokeWidth="2" strokeLinecap="round" />
+          <path d="M8 0 L11 8" stroke="#2F1810" strokeWidth="2" strokeLinecap="round" />
+        </g>
+        
+        {/* Legs */}
+        <ellipse cx="35" cy="85" rx="8" ry="10" fill="#8B4513" />
+        <ellipse cx="65" cy="85" rx="8" ry="10" fill="#8B4513" />
+      </g>
+    </svg>
+  )
+}

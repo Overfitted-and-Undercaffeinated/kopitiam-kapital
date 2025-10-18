@@ -22,6 +22,7 @@ export default function BacktestPage() {
   const [loadingTemplates, setLoadingTemplates] = useState(true)
   const [results, setResults] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [previewMode, setPreviewMode] = useState<'bull' | 'bear'>('bull')
 
   useEffect(() => {
     // Set default dates (1 year back)
@@ -254,28 +255,69 @@ export default function BacktestPage() {
               </div>
             )}
 
-            {results && !loading && (
+              {/* Character Visualization - Always show preview */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
-                {/* Character Visualization - Kopikolt riding bull or fighting bear */}
                 <div className="bg-white rounded-lg border border-[#E5E5E5] overflow-hidden">
                   <div className="p-6 border-b border-[#E5E5E5] text-center">
                     <h3 className="text-xl font-bold text-[#2F1810]">
-                      {isGoodResult() ? '🎉 Yee-Haw! Riding the Bull!' : '⚔️ Battle Mode: Fighting the Bear'}
+                      {results ? (
+                        isGoodResult() ? '🎉 Yee-Haw! Riding the Bull!' : '⚔️ Battle Mode: Fighting the Bear'
+                      ) : (
+                        '🎮 Kopikolt Character Preview'
+                      )}
                     </h3>
                     <p className="text-sm text-[#6B5D52] mt-1">
-                      {isGoodResult() 
-                        ? 'This strategy shows strong performance!' 
-                        : 'This strategy needs improvement. Kopikolt is ready to fight back!'}
+                      {results ? (
+                        isGoodResult() 
+                          ? 'This strategy shows strong performance!' 
+                          : 'This strategy needs improvement. Kopikolt is ready to fight back!'
+                      ) : (
+                        'Run a backtest to see Kopikolt in action! Good results = riding bull, bad results = fighting bear!'
+                      )}
                     </p>
                   </div>
                   <div className="bg-gradient-to-b from-[#FFF8DC] to-[#FAFAF9]" style={{ height: '450px' }}>
-                    <BacktestCharacterScene isGoodResult={isGoodResult()} />
+                    <BacktestCharacterScene isGoodResult={results ? isGoodResult() : previewMode === 'bull'} />
                   </div>
+                  {!results && (
+                    <div className="p-4 bg-gray-50 border-t border-[#E5E5E5]">
+                      <div className="flex justify-center space-x-4">
+                        <button
+                          onClick={() => setPreviewMode('bull')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            previewMode === 'bull'
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          🐂 Bull Mode (Good Results)
+                        </button>
+                        <button
+                          onClick={() => setPreviewMode('bear')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            previewMode === 'bear'
+                              ? 'bg-red-500 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          🐻 Bear Mode (Bad Results)
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              </motion.div>
+
+              {results && !loading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6"
+                >
 
                 {/* Summary Card */}
                 <div className="bg-gradient-to-br from-[#8B7355] to-[#6F5D47] rounded-lg p-6 border border-[#6F5D47] text-white">
