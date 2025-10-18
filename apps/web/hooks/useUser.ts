@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export interface User {
   id: string
@@ -42,14 +44,15 @@ interface UseUserReturn {
   error: string | null
   refetch: () => Promise<void>
   updateUser: (data: Partial<User>) => Promise<void>
+  logout: () => Promise<void>
 }
 
 /**
- * Custom hook to fetch and manage current user data
+ * Custom hook to fetch and manage current user data with Supabase authentication
  * 
  * Usage:
  * ```tsx
- * const { user, loading, error, refetch } = useUser()
+ * const { user, loading, error, refetch, logout } = useUser()
  * 
  * if (loading) return <div>Loading...</div>
  * if (error) return <div>Error: {error}</div>
@@ -62,12 +65,24 @@ export function useUser(): UseUserReturn {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+  const supabase = createClient()
 
   const fetchUser = async () => {
     try {
       setLoading(true)
       setError(null)
 
+      // Check auth state
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      
+      if (!authUser) {
+        setUser(null)
+        setLoading(false)
+        return
+      }
+
+      // Fetch user profile
       const response = await fetch('/api/user')
       const data = await response.json()
 
@@ -108,8 +123,38 @@ export function useUser(): UseUserReturn {
     }
   }
 
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        throw error
+      }
+
+      setUser(null)
+      router.push('/login')
+      router.refresh()
+    } catch (err: any) {
+      console.error('Error logging out:', err)
+      throw err
+    }
+  }
+
   useEffect(() => {
     fetchUser()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        fetchUser()
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   return {
@@ -118,6 +163,7 @@ export function useUser(): UseUserReturn {
     error,
     refetch: fetchUser,
     updateUser,
+    logout,
   }
 }
 

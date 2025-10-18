@@ -1,71 +1,65 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase-server'
 
 /**
  * GET /api/user - Get current user information
- * Retrieves user data based on the user_id cookie
+ * Retrieves user data based on Supabase authentication
  */
 export async function GET(request: Request) {
   try {
-    const cookieStore = cookies()
-    const userId = cookieStore.get('user_id')?.value
+    const supabase = await createServerSupabaseClient()
+    
+    // Get the authenticated user
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
-    if (!userId) {
+    if (authError || !authUser) {
       return NextResponse.json(
         { error: 'Not authenticated', message: 'No user session found' },
         { status: 401 }
       )
     }
 
-    // Get user with their watchlist and positions
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        watchlist: {
-          include: {
-            instrument: {
-              select: {
-                id: true,
-                symbol: true,
-                name: true,
-                assetClass: true,
-              },
-            },
-          },
-          orderBy: {
-            addedAt: 'desc',
-          },
-        },
-        positions: {
-          where: {
-            closedAt: null, // Only get open positions
-          },
-          include: {
-            instrument: {
-              select: {
-                symbol: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    })
+    // Get user profile from database with their watchlist and positions
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select(`
+        *,
+        watchlist:user_watchlist(
+          id,
+          added_at,
+          instrument:instruments(
+            id,
+            symbol,
+            name,
+            asset_class
+          )
+        ),
+        positions(
+          id,
+          instrument_id,
+          quantity,
+          average_price,
+          opened_at,
+          instrument:instruments(
+            symbol,
+            name
+          )
+        )
+      `)
+      .eq('id', authUser.id)
+      .is('positions.closed_at', null)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return NextResponse.json(
-        { error: 'User not found', message: 'User session is invalid' },
+        { error: 'User not found', message: 'User profile not found' },
         { status: 404 }
       )
     }
 
-    // Don't send sensitive data to frontend
-    const { ...userData } = user
-
     return NextResponse.json({
       success: true,
-      user: userData,
+      user: user,
     })
 
   } catch (error: any) {
@@ -82,10 +76,12 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const cookieStore = cookies()
-    const userId = cookieStore.get('user_id')?.value
+    const supabase = await createServerSupabaseClient()
+    
+    // Get the authenticated user
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
-    if (!userId) {
+    if (authError || !authUser) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
@@ -94,31 +90,37 @@ export async function PATCH(request: Request) {
 
     const body = await request.json()
     
-    // Only allow updating specific fields
-    const allowedFields = [
-      'name',
-      'riskProfile',
-      'experienceLevel',
-      'tradingCapitalRange',
-      'primaryMarkets',
-      'briefTime',
-      'preferredVoice',
-      'timezone',
-      'language',
-    ]
+    // Only allow updating specific fields (convert camelCase to snake_case)
+    const fieldMapping: Record<string, string> = {
+      'name': 'name',
+      'riskProfile': 'risk_profile',
+      'experienceLevel': 'explanation_level',
+      'tradingCapitalRange': 'trading_capital_range',
+      'primaryMarkets': 'primary_markets',
+      'briefTime': 'brief_time',
+      'preferredVoice': 'preferred_voice',
+      'timezone': 'timezone',
+      'language': 'language',
+    }
 
     const updateData: any = {}
     
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field]
+    for (const [camelKey, snakeKey] of Object.entries(fieldMapping)) {
+      if (body[camelKey] !== undefined) {
+        updateData[snakeKey] = body[camelKey]
       }
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-    })
+    const { data: updatedUser, error: updateError } = await supabaseAdmin
+      .from('users')
+      .update(updateData)
+      .eq('id', authUser.id)
+      .select()
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
 
     return NextResponse.json({
       success: true,

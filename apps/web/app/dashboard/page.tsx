@@ -37,6 +37,8 @@ export default function DashboardPage() {
   const [todayEODBrief, setTodayEODBrief] = useState<Brief | null>(null)
   const [historicalBriefs, setHistoricalBriefs] = useState<Brief[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [rawMorningData, setRawMorningData] = useState<any>(null)
+  const [rawEODData, setRawEODData] = useState<any>(null)
 
   // Track cursor position
   useEffect(() => {
@@ -47,95 +49,124 @@ export default function DashboardPage() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
 
-  // Fetch briefs on mount - ALWAYS USE DUMMY DATA FOR DEMO
+  // Fetch briefs on mount
   useEffect(() => {
-    // Always load dummy data immediately for demo
-    setTimeout(() => {
-      setDummyData()
-      setIsLoading(false)
-    }, 800)
-  }, [])
-
-  const setDummyData = () => {
-    const today = new Date().toISOString().split('T')[0]
+    const userId = localStorage.getItem('userId') || 'demo_user'
     
-    const dummyMorning: Brief = {
-      id: '1',
-      type: 'morning',
-      date: today,
-      content: {
-        summary: "Well howdy there, partner! Kopi Colt here with your morning round-up. Saddle up 'cause today's lookin' mighty profitable! The markets are ridin' high like a tumbleweed in a dust storm, and I've wrangled up some golden opportunities for ya. Banks are gallopin' ahead, and there's treasure to be found if you know where to dig!",
-        market_overview: "Rise and shine, buckaroo! The STI's opened up 0.3% higher at 3,245 points - that's what I call a strong start to the day! Wall Street gave us a mighty fine boost overnight, and our banking cowboys are leading the charge with DBS up 1.2% in pre-market. Hong Kong's takin' it easy today, but Japan's ridin' up 0.5%. It's a mixed bag across the frontier, but opportunity's knockin'!",
-        key_points: [
-          "Hot diggity! DBS just announced earnings that knocked it clean outta the park - beat expectations by 8%! That's what I call shootin' straight!",
-          "Singapore's GDP got revised upward to 3.2% - economy's stronger than a bull at a rodeo, partner!",
-          "Tech sector's takin' some heat from them US chip restrictions - might see some good entry points for the brave!",
-          "REITs are catchin' wind with stable interest rates - steady as a trusty steed!",
-          "Keep your eyes peeled for the Fed Chair speech at 10PM SGT - could shake things up come tomorrow!"
-        ],
-        recommendations: [
-          "DBS Group Holdings (D05) - This stallion's ready to run! Strong buy on that earnings beat. Hop on at $35.20, ridin' to $37.50!",
-          "CapitaLand Investment (9CI) - Time to accumulate, partner. REIT strength lookin' solid. Entry: $3.15, Target: $3.45",
-          "Venture Corp (V03) - Keep this one in your sights. Oversold bounce comin'. Entry: $15.80, Stop-loss: $15.20 - don't let it buck ya off!"
-        ]
-      }
-    }
-
-    const dummyEOD: Brief = {
-      id: '2',
-      type: 'eod',
-      date: today,
-      content: {
-        summary: "Well partner, we can hang up our spurs for today - and what a ride it was! Kopi Colt here reportin' from the end of the trail. Your portfolio rode like a champion today, with solid gains across the board. The banks delivered just like I told ya this mornin', and we dodged them tech tumbleweeds real nice!",
-        market_overview: "The dust has settled and the STI closed up 0.45% at 3,259 points - not bad for a day's work! Banking stocks were the real heroes, leadin' the stampede. We saw some mighty fine volume at 1.2B shares traded - that's a busy waterin' hole! Hong Kong dipped 0.3% but Japan finished strong at +0.8%. Mixed results across the frontier, but we came out on top!",
-        key_points: [
-          "Hot damn! Your DBS position galloped up 1.5% today - that's $450 straight into your saddlebag!",
-          "Tech stocks got a little dusty as expected, but we held our ground at them support levels - no stampede here!",
-          "Banking sector's still got momentum - looks like tomorrow's gonna be another good day for a ride!",
-          "Keep your eyes open for some profit-takin' in early trading tomorrow - some cowboys might cash in their chips",
-          "Your risk exposure is lookin' mighty conservative - just the way I like it, partner!"
-        ],
-        portfolio_summary: {
-          total_value: "$52,450",
-          daily_pnl: "+$685 (+1.3%)",
-          positions: 5
-        }
-      }
-    }
-
-    const historical: Brief[] = [
-      {
-        id: '3',
-        type: 'morning',
-        date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-        content: {
-          summary: "Yesterday's morning brief...",
-          market_overview: "Markets opened cautiously...",
-          key_points: ["Point 1", "Point 2"],
-          recommendations: ["Rec 1"]
-        }
-      },
-      {
-        id: '4',
-        type: 'eod',
-        date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-        content: {
-          summary: "Yesterday's EOD report...",
-          market_overview: "Markets closed mixed...",
-          key_points: ["Point 1", "Point 2"],
-          portfolio_summary: {
-            total_value: "$51,765",
-            daily_pnl: "-$235 (-0.45%)",
-            positions: 5
+    // Try to fetch real briefs from AI backend
+    fetchRealBriefs(userId)
+  }, [])
+  
+  const fetchRealBriefs = async (userId: string) => {
+    setIsLoading(true)
+    
+    try {
+      const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+      const watchlist = ['NVDA', 'AAPL', 'DBS'] // Default watchlist
+      
+      console.log('=== FETCHING MORNING BRIEF FROM PYTHON API ===')
+      console.log('API URL:', AI_API_URL)
+      console.log('Request payload:', { watchlist, market: 'US', user_id: userId, include_voice: false })
+      
+      // Fetch raw morning brief directly from Python backend
+      const morningResponse = await fetch(`${AI_API_URL}/briefs/morning`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          watchlist,
+          market: 'US',
+          user_id: userId,
+          include_voice: true
+        }),
+        signal: AbortSignal.timeout(60000) // 60 second timeout
+      })
+      
+      console.log('Morning brief response status:', morningResponse.status)
+      
+      if (morningResponse.ok) {
+        const morningData = await morningResponse.json()
+        console.log('✅ MORNING BRIEF RECEIVED FROM PYTHON API:')
+        console.log('Full response:', morningData)
+        setRawMorningData(morningData)
+        
+        // Create a simple brief object for fallback
+        setTodayMorningBrief({
+          id: '1',
+          type: 'morning',
+          date: new Date().toISOString(),
+          content: {
+            summary: morningData.text || 'No summary available',
+            market_overview: morningData.text || 'No overview available',
+            key_points: []
           }
-        }
+        })
+      } else {
+        const errorText = await morningResponse.text()
+        console.error('❌ Failed to fetch morning brief from backend')
+        console.error('Status:', morningResponse.status)
+        console.error('Error response:', errorText)
       }
-    ]
-
-    setTodayMorningBrief(dummyMorning)
-    setTodayEODBrief(dummyEOD)
-    setHistoricalBriefs(historical)
+      
+      console.log('=== FETCHING EOD BRIEF FROM PYTHON API ===')
+      
+      // Fetch raw EOD brief directly from Python backend
+      const eodResponse = await fetch(`${AI_API_URL}/briefs/eod`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          watchlist,
+          market: 'US',
+          user_id: userId,
+          include_voice: true
+        }),
+        signal: AbortSignal.timeout(60000) // 60 second timeout
+      })
+      
+      console.log('EOD brief response status:', eodResponse.status)
+      
+      if (eodResponse.ok) {
+        const eodData = await eodResponse.json()
+        console.log('✅ EOD BRIEF RECEIVED FROM PYTHON API:')
+        console.log('Full response:', eodData)
+        setRawEODData(eodData)
+        
+        // Create a simple brief object for fallback
+        setTodayEODBrief({
+          id: '2',
+          type: 'eod',
+          date: new Date().toISOString(),
+          content: {
+            summary: eodData.text || 'No summary available',
+            market_overview: eodData.text || 'No overview available',
+            key_points: []
+          }
+        })
+      } else {
+        const errorText = await eodResponse.text()
+        console.error('❌ Failed to fetch EOD brief from backend')
+        console.error('Status:', eodResponse.status)
+        console.error('Error response:', errorText)
+      }
+      
+      // If both failed, log it clearly but don't use dummy data
+      if (!morningResponse.ok && !eodResponse.ok) {
+        console.error('❌ BOTH BRIEFS FAILED - NO DATA AVAILABLE')
+        console.error('Check that Python backend is running at:', AI_API_URL)
+      }
+      
+    } catch (error) {
+      console.error('❌ EXCEPTION WHILE FETCHING BRIEFS:', error)
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      })
+    } finally {
+      setIsLoading(false)
+      console.log('=== BRIEF FETCHING COMPLETE ===')
+    }
   }
+
 
   if (isLoading) {
     return (
@@ -460,7 +491,7 @@ export default function DashboardPage() {
         </AnimatePresence>
       </div>
 
-      {/* Brief Overlays - ALWAYS RENDER FOR DEMO */}
+      {/* Brief Overlays - SHOW RAW BACKEND DATA */}
       <BriefOverlay
         isOpen={showMorningBrief && !isLoading}
         onClose={() => setShowMorningBrief(false)}
@@ -472,6 +503,7 @@ export default function DashboardPage() {
           key_points: todayMorningBrief?.content.key_points || ["Loading..."],
           recommendations: todayMorningBrief?.content.recommendations || []
         }}
+        rawBackendData={rawMorningData}
       />
       {todayEODBrief && (
         <BriefOverlay
@@ -482,6 +514,7 @@ export default function DashboardPage() {
             date: todayEODBrief.date,
             ...todayEODBrief.content,
           }}
+          rawBackendData={rawEODData}
         />
       )}
     </div>
