@@ -74,6 +74,10 @@ class EODBriefAgent:
         """
         logger.info(f"Generating EOD brief for {user_id}, watchlist: {watchlist}, market: {market}")
         
+        # Validate watchlist
+        if not watchlist or len(watchlist) == 0:
+            raise ValueError("Watchlist cannot be empty. Please provide at least one symbol.")
+        
         try:
             # Step 1: Get EOD performance for watchlist
             performance_data = await self._get_watchlist_performance(watchlist)

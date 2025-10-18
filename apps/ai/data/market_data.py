@@ -11,8 +11,10 @@ import logging
 # Flexible imports
 try:
     from ..utils.config import settings
+    from ..data.data_cache import market_data_cache
 except ImportError:
     from utils.config import settings
+    from data.data_cache import market_data_cache
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +54,12 @@ class MarketDataService:
         try:
             if self.provider == "yfinance":
                 ticker = yf.Ticker(symbol)
-                data = ticker.history(period="1d")
+                # Use 5d period to get data even when markets are closed
+                data = ticker.history(period="5d")
                 if data.empty:
                     logger.warning(f"No data for {symbol}")
                     return None
+                # Get the most recent closing price
                 return float(data['Close'].iloc[-1])
             
             elif self.provider == "alphavantage":
@@ -73,7 +77,7 @@ class MarketDataService:
         interval: str = "1d"
     ) -> Optional[pd.DataFrame]:
         """
-        Get OHLCV data
+        Get OHLCV data with caching
         
         Args:
             symbol: Ticker symbol
@@ -86,22 +90,27 @@ class MarketDataService:
         if settings.use_mock_market_data:
             return self._mock_ohlcv(symbol, period)
         
-        try:
-            if self.provider == "yfinance":
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period=period, interval=interval)
-                return data
+        # Define fetch function for cache
+        async def fetch_data():
+            try:
+                if self.provider == "yfinance":
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(period=period, interval=interval)
+                    return data
+                
+                elif self.provider == "alphavantage":
+                    # Alpha Vantage has different period/interval logic
+                    data, _ = self.av.get_daily(symbol=symbol, outputsize='full')
+                    # Convert to match yfinance format
+                    data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+                    return data.head(self._period_to_days(period))
             
-            elif self.provider == "alphavantage":
-                # Alpha Vantage has different period/interval logic
-                data, _ = self.av.get_daily(symbol=symbol, outputsize='full')
-                # Convert to match yfinance format
-                data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-                return data.head(self._period_to_days(period))
+            except Exception as e:
+                logger.error(f"Error fetching OHLCV for {symbol}: {e}")
+                return None
         
-        except Exception as e:
-            logger.error(f"Error fetching OHLCV for {symbol}: {e}")
-            return None
+        # Use cache (saves 1-3 seconds on cache hits!)
+        return await market_data_cache.get_or_fetch(symbol, period, fetch_data)
     
     async def get_intraday(
         self,

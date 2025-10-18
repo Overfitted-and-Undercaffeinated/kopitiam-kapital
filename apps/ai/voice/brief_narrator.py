@@ -11,9 +11,11 @@ import httpx
 try:
     from ..utils.config import settings
     from ..utils.cost_tracker import cost_tracker
+    from ..utils.http_client import http_client_manager
 except ImportError:
     from utils.config import settings
     from utils.cost_tracker import cost_tracker
+    from utils.http_client import http_client_manager
 
 logger = logging.getLogger(__name__)
 
@@ -87,31 +89,32 @@ class BriefNarrator:
                 }
             }
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
+            # Use shared HTTP client for connection pooling
+            client = await http_client_manager.get_client()
+            response = await client.post(url, json=payload, headers=headers)
+            
+            if response.status_code == 200:
+                audio_bytes = response.content
                 
-                if response.status_code == 200:
-                    audio_bytes = response.content
-                    
-                    # Track cost (~$0.30 per 1K characters)
-                    char_count = len(text)
-                    estimated_cost = (char_count / 1000) * 0.30
-                    
-                    if user_id:
-                        await cost_tracker.log_cost(
-                            user_id=user_id,
-                            service="elevenlabs-tts",
-                            tokens_input=0,
-                            tokens_output=char_count,
-                            metadata={"voice_id": vid, "chars": char_count, "estimated_cost": estimated_cost}
-                        )
-                    
-                    logger.info(f"Generated voice narration: {char_count} chars, ~${estimated_cost:.2f}")
-                    return audio_bytes
+                # Track cost (~$0.30 per 1K characters)
+                char_count = len(text)
+                estimated_cost = (char_count / 1000) * 0.30
                 
-                else:
-                    logger.error(f"ElevenLabs error {response.status_code}: {response.text}")
-                    return None
+                if user_id:
+                    await cost_tracker.log_cost(
+                        user_id=user_id,
+                        service="elevenlabs-tts",
+                        tokens_input=0,
+                        tokens_output=char_count,
+                        metadata={"voice_id": vid, "chars": char_count, "estimated_cost": estimated_cost}
+                    )
+                
+                logger.info(f"Generated voice narration: {char_count} chars, ~${estimated_cost:.2f}")
+                return audio_bytes
+            
+            else:
+                logger.error(f"ElevenLabs error {response.status_code}: {response.text}")
+                return None
         
         except Exception as e:
             logger.error(f"Voice generation failed: {e}")

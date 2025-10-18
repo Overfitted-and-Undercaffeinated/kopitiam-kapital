@@ -4,7 +4,6 @@ Uses Groq for fast, detailed performance analysis
 """
 import logging
 import time
-import re
 from typing import Dict, Optional
 from openai import OpenAI
 
@@ -19,39 +18,39 @@ logger = logging.getLogger(__name__)
 # System prompt for backtest explanation
 BACKTEST_EXPLAINER_SYSTEM_PROMPT = """You are an expert trading analyst and educator. Your role is to explain backtest results in a clear, insightful, and conversational manner suitable for voice narration.
 
-Your audience: Traders ranging from beginners to intermediates who want to understand if a strategy is worth using.
+**Your audience**: Traders ranging from beginners to intermediates who want to understand if a strategy is worth using.
 
-Your tone: Conversational, educational, and honest. Don't oversell or undersell - be realistic.
+**Your tone**: Conversational, educational, and honest. Don't oversell or undersell - be realistic.
 
-Structure your explanation to cover:
+**Structure your explanation to cover:**
 
-1. Strategy Overview (30 seconds)
+1. **Strategy Overview** (30 seconds)
    - Briefly explain what the strategy does in plain English
    - Who might use this strategy (trend followers, mean reversion traders, etc.)
 
-2. Performance Assessment (60 seconds)
+2. **Performance Assessment** (60 seconds)
    - Overall verdict: Was it profitable? How profitable?
    - Win rate and what it means
    - Sharpe ratio and what it indicates about risk-adjusted returns
    - Total return vs buy-and-hold context
 
-3. Risk Analysis (45 seconds)
+3. **Risk Analysis** (45 seconds)
    - Maximum drawdown and what it means for capital preservation
    - VaR (Value at Risk) - explain the worst-case loss in simple terms
    - Number of trades (is it too frequent? too infrequent?)
    - Average win vs average loss
 
-4. Key Insights (30 seconds)
+4. **Key Insights** (30 seconds)
    - When did it work best? When did it struggle?
    - Any notable patterns or concerns
    - Profit factor context
 
-5. Recommendation (15 seconds)
+5. **Recommendation** (15 seconds)
    - Should the user consider this strategy?
    - Any modifications they might explore
    - When to use it vs when to avoid it
 
-Guidelines:
+**Guidelines:**
 - Use simple language - avoid jargon or explain it when necessary
 - Compare metrics to industry standards when relevant (Sharpe > 1 is good, > 2 is excellent)
 - Be honest about limitations
@@ -59,15 +58,12 @@ Guidelines:
 - Keep it under 3 minutes when read aloud (aim for 400-500 words)
 - Use natural transitions between sections
 - Include specific numbers but round them for clarity (67% not 66.67%)
-- Use proper HTML formatting: <h3> for headers, <b> for bold text
-- Do NOT use markdown syntax like **bold** or ### headers
 
-Avoid:
+**Avoid:**
 - Being overly technical
 - Making promises about future performance
 - Saying "in conclusion" or "to summarize" (just flow naturally)
-- Listing bullet points (make it narrative)
-- Using markdown formatting"""
+- Listing bullet points (make it narrative)"""
 
 class BacktestExplainerAgent:
     """
@@ -81,52 +77,6 @@ class BacktestExplainerAgent:
         self.client = client or get_groq_client()
         self.model = "llama-3.3-70b-versatile"
         logger.info(f"Initialized BacktestExplainerAgent with model: {self.model}")
-    
-    async def explain(
-        self,
-        backtest_result: Dict,
-        strategy_name: str,
-        symbol: str,
-        conversational: bool = True
-    ) -> str:
-        """
-        Generate explanation of backtest results (new unified interface)
-        
-        Args:
-            backtest_result: Complete backtest result dict with metrics
-            strategy_name: Name of the strategy
-            symbol: Stock symbol
-            conversational: If True, use conversational narrative style
-        
-        Returns:
-            Conversational narrative explanation
-        """
-        # Extract metrics
-        metrics = backtest_result
-        
-        # Determine time period from trades if available
-        trades = backtest_result.get('trades', [])
-        if trades and len(trades) > 0:
-            first_trade = trades[0]
-            last_trade = trades[-1]
-            period = f"{first_trade.get('entry_date', '')[:10]} to {last_trade.get('exit_date', '')[:10]}"
-        else:
-            period = "2 years"
-        
-        # Generate conversational narrative
-        if conversational:
-            return await self.generate_explanation(
-                strategy_name=strategy_name,
-                strategy_description=f"{strategy_name} strategy",
-                metrics=metrics,
-                symbol=symbol,
-                period=period
-            )
-        else:
-            # Fall back to basic explanation
-            return self._generate_fallback_explanation(
-                strategy_name, metrics, symbol, period
-            )
     
     async def generate_explanation(
         self,
@@ -284,8 +234,7 @@ Remember: Be conversational, educational, and honest. This will be read aloud.""
             if not content:
                 raise ValueError("Empty response from Groq")
             
-            # Convert any markdown to HTML before returning
-            return self._convert_markdown_to_html(content.strip())
+            return content.strip()
             
         except Exception as e:
             if retry:
@@ -296,36 +245,6 @@ Remember: Be conversational, educational, and honest. This will be read aloud.""
                 )
             else:
                 raise
-    
-    def _convert_markdown_to_html(self, text: str) -> str:
-        """Convert any markdown syntax to HTML using regex"""
-        if not text:
-            return text
-            
-        # Convert headers ### -> <h3>, ## -> <h2>, # -> <h1>
-        text = re.sub(r'^### (.+)$', r'<h3>\1</h3>', text, flags=re.MULTILINE)
-        text = re.sub(r'^## (.+)$', r'<h2>\1</h2>', text, flags=re.MULTILINE)
-        text = re.sub(r'^# (.+)$', r'<h1>\1</h1>', text, flags=re.MULTILINE)
-        
-        # Convert bold **text** -> <b>text</b>
-        text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
-        
-        # Convert italic *text* -> <i>text</i>
-        text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
-        
-        # Convert bullet points • -> <li>
-        text = re.sub(r'^• (.+)$', r'<li>\1</li>', text, flags=re.MULTILINE)
-        
-        # Wrap consecutive <li> elements in <ul>
-        text = re.sub(r'(<li>.*?</li>(?:\s*<li>.*?</li>)*)', r'<ul>\1</ul>', text, flags=re.DOTALL)
-        
-        # Convert line breaks \n\n -> <br><br>
-        text = re.sub(r'\n\n', '<br><br>', text)
-        
-        # Convert single line breaks \n -> <br> (but not after headers or lists)
-        text = re.sub(r'\n(?!</h[1-3]>|</ul>|</li>)', '<br>', text)
-        
-        return text
     
     def _generate_fallback_explanation(
         self,

@@ -10,6 +10,7 @@ import logging
 import time
 from pathlib import Path
 from typing import Dict
+from contextlib import asynccontextmanager
 
 # Load environment variables from project root
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -23,14 +24,47 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import models and agents
-from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse
+from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse, OrchestrateRequest
 from agents.router import RouterAgent
+
+# Lifespan handler for startup/shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan handler for resource management
+    
+    Handles:
+    - Startup initialization
+    - Graceful shutdown and cleanup
+    """
+    # Startup
+    logger.info("🚀 Starting Kopitiam Capital AI Backend...")
+    yield
+    # Shutdown
+    logger.info("🔄 Shutting down gracefully...")
+    
+    # Close asyncpraw Reddit client
+    try:
+        from sentiment.social_scraper import social_sentiment_analyzer
+        await social_sentiment_analyzer.close()
+    except Exception as e:
+        logger.warning(f"Error closing social sentiment analyzer: {e}")
+    
+    # Close shared HTTP client
+    try:
+        from utils.http_client import http_client_manager
+        await http_client_manager.close()
+    except Exception as e:
+        logger.warning(f"Error closing HTTP client: {e}")
+    
+    logger.info("✅ Shutdown complete")
 
 # Create FastAPI app
 app = FastAPI(
     title="Kopitiam Capital AI",
     description="AI-powered trading intelligence API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -154,6 +188,49 @@ async def health_check():
         }
     }
 
+@app.get("/system/capabilities")
+async def get_system_capabilities():
+    """
+    Show what advanced features are available
+    
+    Returns system capabilities including MCP server status.
+    All features require MCP to be operational.
+    """
+    from utils.mcp_client import mcp_risk_client
+    
+    if not mcp_risk_client.enabled:
+        return {
+            "mcp_risk_tools": {
+                "enabled": False,
+                "status": "unavailable",
+                "error": "MCP server not running. Please ensure Node.js is installed.",
+                "features": []
+            },
+            "system_status": "degraded"
+        }
+    
+    return {
+        "mcp_risk_tools": {
+            "enabled": True,
+            "status": "operational",
+            "features": [
+                "Kelly Criterion position sizing",
+                "Professional VaR calculations",
+                "ATR-based stop optimization",
+                "Risk/reward analysis",
+                "Time-scaled portfolio risk metrics"
+            ],
+            "server_version": "1.0.0"
+        },
+        "ai_models": {
+            "groq": "llama-3.3-70b-versatile",
+            "openai": "gpt-4o",
+            "voice": "elevenlabs"
+        },
+        "data_sources": ["yfinance", "alpha_vantage", "reddit", "exa"],
+        "system_status": "operational"
+    }
+
 @app.post("/ai/route", response_model=RouterResponse)
 async def route_query(request: RouterRequest):
     """
@@ -189,11 +266,7 @@ async def route_query(request: RouterRequest):
         )
 
 @app.post("/ai/orchestrate")
-async def orchestrate_request(
-    query: str,
-    user_id: str,
-    context: Dict = None
-):
+async def orchestrate_request(request: OrchestrateRequest):
     """
     Orchestrate complete AI workflow
     
@@ -211,9 +284,7 @@ async def orchestrate_request(
     - "Show my portfolio" → PORTFOLIO → Positions + P&L
     
     Args:
-        query: Natural language query
-        user_id: User ID
-        context: Optional context dict
+        request: OrchestrateRequest with query, user_id, and optional context
     
     Returns:
         {
@@ -225,9 +296,9 @@ async def orchestrate_request(
         from agents.orchestrator import orchestrator_agent
         
         result = await orchestrator_agent.handle_request(
-            query=query,
-            user_id=user_id,
-            context=context
+            query=request.query,
+            user_id=request.user_id,
+            context=request.context
         )
         
         return result
@@ -368,11 +439,236 @@ async def generate_eod_report(user_id: str):
     # TODO: Implement EOD report agent
     return {"message": "Not implemented yet"}
 
-@app.post("/ai/longctx")
-async def analyze_filing(ticker: str, filing_type: str):
-    """Analyze long-form financial documents"""
-    # TODO: Implement long-context analyst
-    return {"message": "Not implemented yet"}
+# ============================================================================
+# MONITOR, LONG CONTEXT, AND EXPLAINER ENDPOINTS
+# ============================================================================
+
+@app.post("/alerts/check")
+async def check_user_alerts(user_id: str):
+    """
+    Check and trigger user alerts
+    
+    Monitors positions and alert rules, triggers notifications for:
+    - Price thresholds (FREE tier)
+    - Volatility + sentiment changes (PRO tier)
+    - News events + technical signals (ENTERPRISE tier)
+    
+    Alert limits:
+    - FREE: 3 per day
+    - PRO: 50 per day
+    - ENTERPRISE: Unlimited
+    """
+    try:
+        from agents.monitor import market_monitor_agent
+        
+        logger.info(f"Checking alerts for user {user_id}")
+        
+        # Check alerts
+        alerts = await market_monitor_agent.check_alerts(user_id)
+        
+        # Check positions
+        position_alerts = await market_monitor_agent.monitor_positions(user_id)
+        
+        return {
+            "user_id": user_id,
+            "alerts": alerts,
+            "position_alerts": position_alerts,
+            "total_triggered": len(alerts) + len(position_alerts)
+        }
+    
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error checking alerts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/alerts/create")
+async def create_alert_rule(
+    user_id: str,
+    symbol: str,
+    alert_type: str,
+    condition: Dict
+):
+    """
+    Create a new alert rule
+    
+    Args:
+        user_id: User ID
+        symbol: Stock symbol
+        alert_type: Type of alert (price_above, price_below, etc.)
+        condition: Alert condition (e.g., {"price": 100})
+    
+    Returns:
+        Created alert rule
+    """
+    try:
+        from agents.monitor import market_monitor_agent, AlertType
+        
+        logger.info(f"Creating alert for {user_id}: {symbol} {alert_type}")
+        
+        # Create alert rule
+        alert_rule = await market_monitor_agent.create_alert_rule(
+            user_id=user_id,
+            symbol=symbol,
+            alert_type=AlertType(alert_type),
+            condition=condition
+        )
+        
+        return alert_rule
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating alert: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis/long-context")
+async def analyze_long_document(
+    text: str,
+    document_type: str,
+    user_id: str,
+    ticker: str = None
+):
+    """
+    Analyze long-form financial documents
+    
+    Uses Anthropic Claude with 200K context window.
+    
+    Analysis depth by tier:
+    - FREE: Basic summary + metrics (1 per month)
+    - PRO: Summary + risks + opportunities (10 per month)
+    - ENTERPRISE: Full analysis + competitive positioning (unlimited)
+    
+    Args:
+        text: Document text
+        document_type: Type (e.g., "10-K", "annual_report", "earnings_call")
+        user_id: User ID
+        ticker: Optional stock ticker
+    
+    Returns:
+        Analysis results
+    """
+    try:
+        from agents.longctx import long_context_analyst
+        
+        logger.info(f"Analyzing {document_type} for user {user_id} (ticker: {ticker})")
+        
+        # Analyze document
+        analysis = await long_context_analyst.analyze_document(
+            text=text,
+            document_type=document_type,
+            user_id=user_id,
+            ticker=ticker
+        )
+        
+        return analysis
+    
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error analyzing document: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis/long-context/auto-fetch")
+async def auto_fetch_and_analyze(
+    ticker: str,
+    user_id: str,
+    include_earnings_call: bool = True
+):
+    """
+    Auto-fetch and analyze financial documents via Exa.ai
+    
+    Automatically searches for and analyzes:
+    - Latest 10-K (SEC filing)
+    - Latest earnings call transcript (optional)
+    
+    Analysis depth by tier:
+    - FREE: Basic summary (1 document/month)
+    - PRO: Summary + risks + opportunities (10 documents/month)
+    - ENTERPRISE: Full analysis (unlimited)
+    
+    Args:
+        ticker: Stock ticker (e.g., "AAPL", "TSLA", "GOOGL")
+        user_id: User ID
+        include_earnings_call: Whether to include earnings call (default: True)
+    
+    Returns:
+        Combined analysis of fetched documents
+    """
+    try:
+        from agents.longctx import long_context_analyst
+        
+        logger.info(f"Auto-fetching documents for {ticker} (user: {user_id})")
+        
+        # Fetch and analyze documents
+        analysis = await long_context_analyst.fetch_and_analyze(
+            ticker=ticker,
+            user_id=user_id,
+            include_earnings_call=include_earnings_call
+        )
+        
+        return analysis
+    
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in auto-fetch-and-analyze: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/explain")
+async def explain_concept(
+    topic: str,
+    user_id: str,
+    level_override: str = None,
+    category: str = None
+):
+    """
+    Explain a trading concept
+    
+    Adapts explanation to user's knowledge level (from Mem0 profile).
+    
+    Topics by tier:
+    - FREE: Trading concepts (RSI, MACD, support/resistance)
+    - PRO: + Platform features (briefs, alerts, backtesting)
+    - ENTERPRISE: + Advanced strategies (swing trading, risk management)
+    
+    Args:
+        topic: Topic to explain
+        user_id: User ID
+        level_override: Override knowledge level (beginner/intermediate/advanced)
+        category: Optional category hint
+    
+    Returns:
+        Explanation with examples and next steps
+    """
+    try:
+        from agents.explainer import explainer_agent
+        
+        logger.info(f"Explaining '{topic}' to user {user_id}")
+        
+        # Generate explanation
+        explanation = await explainer_agent.explain(
+            topic=topic,
+            user_id=user_id,
+            level_override=level_override,
+            category=category
+        )
+        
+        # Check for upgrade prompt
+        if "error" in explanation:
+            raise HTTPException(status_code=403, detail=explanation["error"])
+        
+        return explanation
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error explaining topic: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================
 # BACKTESTING ENDPOINTS
@@ -419,31 +715,71 @@ async def get_strategy_template(template_id: str):
 async def run_backtest(
     symbol: str,
     strategy_definition: Dict = None,
+    natural_language_strategy: str = None,
     strategy_template_id: str = None,
     start_date: str = None,
     end_date: str = None,
-    initial_capital: float = 100000
+    initial_capital: float = 100000,
+    include_visuals: bool = True,
+    include_voice: bool = True,  # Voice narration enabled by default
+    user_id: str = None
 ):
     """
-    Run a backtest with custom strategy or template
+    Enhanced backtest with natural language input, visual output, and AI explanation
     
-    **Latency target**: <5s for 1-year backtest
+    **Latency target**: 10-15s for complete analysis with voice (2-year backtest)
+    
+    **NEW FEATURES**:
+    - Natural language strategy input: "buy when RSI is below 30"
+    - Visual chart data (equity curve, drawdown series, monthly returns)
+    - AI-generated performance explanation
+    - Voice narration with ElevenLabs
+    - Advanced risk metrics (VaR, CVaR)
     
     Args:
         symbol: Stock ticker
         strategy_definition: Custom strategy JSON (optional)
+        natural_language_strategy: Strategy in plain English (NEW, optional)
         strategy_template_id: Use a pre-built template (optional)
-        start_date: Start date (YYYY-MM-DD, optional)
-        end_date: End date (YYYY-MM-DD, optional)
+        start_date: Start date (YYYY-MM-DD, optional, defaults to 2 years ago)
+        end_date: End date (YYYY-MM-DD, optional, defaults to today)
         initial_capital: Starting capital (default: $100,000)
+        include_visuals: Include chart data (default: True)
+        include_voice: Include voice narration (default: True)
+        user_id: User ID for cost tracking (optional)
     
     Returns:
         {
-            "metrics": {...},
-            "trades": [...],
-            "equity_curve": [...],
-            "summary": {...}
+            "symbol": "NVDA",
+            "strategy": {...},
+            "metrics": {
+                "win_rate": 0.67,
+                "sharpe_ratio": 1.85,
+                "total_return_pct": 0.23,
+                "var_95": -0.05,
+                "cvar_95": -0.07,
+                ...
+            },
+            "visuals": {
+                "equity_curve": [{date, equity}],
+                "drawdown_series": [{date, drawdown}],
+                "monthly_returns": {"2023-01": 0.05, ...},
+                "trade_distribution": {wins: 30, losses: 15}
+            },
+            "explanation": "This strategy works by...",
+            "voice_audio_base64": "...",
+            "period": "2023-01-01 to 2025-01-01"
         }
+    
+    Examples:
+        # Natural language
+        POST /backtest/run {"symbol": "AAPL", "natural_language_strategy": "buy when price is below the 2 week low"}
+        
+        # Template
+        POST /backtest/run {"symbol": "MSFT", "strategy_template_id": "rsi_oversold"}
+        
+        # Without voice (faster)
+        POST /backtest/run {"symbol": "TSLA", "natural_language_strategy": "buy on MACD crossover", "include_voice": false}
     """
     try:
         from backtesting.engine import BacktestEngine
@@ -452,46 +788,133 @@ async def run_backtest(
         from data.market_data import market_data_service
         from datetime import datetime, timedelta
         
-        logger.info(f"Running backtest for {symbol}")
+        logger.info(f"Running enhanced backtest for {symbol}")
         
-        # Get strategy
-        if strategy_template_id:
+        # STEP 1: Determine strategy source
+        if natural_language_strategy:
+            logger.info(f"Translating natural language strategy: '{natural_language_strategy}'")
+            from agents.strategy_translator import strategy_translator
+            
+            try:
+                strategy_def = await strategy_translator.translate_strategy(
+                    natural_language=natural_language_strategy,
+                    symbol=symbol
+                )
+                logger.info(f"Strategy translated to: {strategy_def['name']}")
+            except Exception as e:
+                logger.error(f"Strategy translation failed: {e}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not translate strategy: {str(e)}. Please rephrase or try a different description."
+                )
+        elif strategy_template_id:
             strategy_def = get_template(strategy_template_id)
             if not strategy_def:
-                raise HTTPException(status_code=404, detail=f"Template '{strategy_template_id}' not found")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Template '{strategy_template_id}' not found"
+                )
         elif strategy_definition:
             strategy_def = strategy_definition
         else:
-            raise HTTPException(status_code=400, detail="Must provide either strategy_definition or strategy_template_id")
+            raise HTTPException(
+                status_code=400,
+                detail="Must provide natural_language_strategy, strategy_definition, or strategy_template_id"
+            )
         
-        # Build strategy function
-        strategy_func = strategy_builder.build_strategy(strategy_def)
-        
-        # Set date defaults
+        # STEP 2: Set date range (default to 2 years)
         if not start_date:
-            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
         if not end_date:
             end_date = datetime.now().strftime('%Y-%m-%d')
         
-        # Run backtest
+        logger.info(f"Backtesting period: {start_date} to {end_date}")
+        
+        # STEP 3: Build and run strategy
+        strategy_func = await strategy_builder.build_strategy(strategy_def)
         engine = BacktestEngine()
+        
         results = await engine.run_backtest(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
             strategy_fn=strategy_func,
-            initial_capital=initial_capital
+            initial_capital=initial_capital,
+            include_visuals=include_visuals
         )
         
-        logger.info(f"Backtest complete for {symbol}: {results['total_return_pct']:.2%} return, {results['num_trades']} trades")
+        logger.info(
+            f"Backtest complete: {results['total_return_pct']:.2%} return, "
+            f"{results['num_trades']} trades, {results['win_rate']:.2%} win rate"
+        )
         
-        return {
+        # STEP 4: Calculate VaR and CVaR
+        from data.risk import calculate_var, calculate_cvar
+        
+        returns = [t['pnl_pct'] for t in results['trades'] if t.get('pnl_pct') is not None]
+        if returns:
+            results['var_95'] = calculate_var(returns, 0.95)
+            results['cvar_95'] = calculate_cvar(returns, 0.95)
+            logger.info(f"Risk metrics: VaR={results['var_95']:.2%}, CVaR={results['cvar_95']:.2%}")
+        else:
+            results['var_95'] = 0.0
+            results['cvar_95'] = 0.0
+        
+        # STEP 5: Generate AI explanation
+        from agents.backtest_explainer import backtest_explainer
+        
+        try:
+            explanation = await backtest_explainer.generate_explanation(
+                strategy_name=strategy_def['name'],
+                strategy_description=strategy_def.get('description', 'Custom trading strategy'),
+                metrics=results,
+                symbol=symbol,
+                period=f"{start_date} to {end_date}"
+            )
+            logger.info(f"Explanation generated: {len(explanation)} characters")
+        except Exception as e:
+            logger.error(f"Explanation generation failed: {e}")
+            explanation = f"Backtest completed for {strategy_def['name']} on {symbol}. "\
+                         f"Total return: {results['total_return_pct']:.2%}, "\
+                         f"Win rate: {results['win_rate']:.2%}, "\
+                         f"Sharpe ratio: {results['sharpe_ratio']:.2f}."
+        
+        # STEP 6: Generate voice narration (if requested)
+        voice_audio = None
+        if include_voice:
+            from voice.brief_narrator import brief_narrator
+            
+            try:
+                audio_bytes = await brief_narrator.generate_voice(
+                    text=explanation,
+                    user_id=user_id
+                )
+                if audio_bytes:
+                    voice_audio = brief_narrator.encode_audio(audio_bytes)
+                    logger.info(f"Voice narration generated: {len(audio_bytes)} bytes")
+                else:
+                    logger.warning("Voice generation returned None")
+            except Exception as e:
+                logger.error(f"Voice generation failed: {e}")
+                # Continue without voice (graceful degradation)
+        
+        # STEP 7: Return comprehensive response
+        response = {
             'symbol': symbol,
-            'strategy': strategy_def.get('name', 'Custom'),
-            'metrics': results,  # Return metrics directly
+            'strategy': strategy_def,
+            'metrics': results,
+            'explanation': explanation,
             'period': f"{start_date} to {end_date}",
             'initial_capital': initial_capital
         }
+        
+        # Add voice if available
+        if voice_audio:
+            response['voice_audio_base64'] = voice_audio
+        
+        logger.info(f"Enhanced backtest response prepared for {symbol}")
+        
+        return response
         
     except HTTPException:
         raise
@@ -511,9 +934,10 @@ async def get_sentiment(symbol: str, user_id: str = None):
     **Latency target**: <3s (95th percentile)
     
     Combines:
-    - News sentiment (Exa.ai + LLM scoring) - 40% weight
-    - Reddit sentiment (r/wallstreetbets, r/stocks) - 30% weight
-    - StockTwits sentiment - 30% weight
+    - News sentiment (Exa.ai + LLM scoring) - 60% weight
+    - Reddit sentiment (r/wallstreetbets, r/stocks) - 40% weight
+    
+    Note: StockTwits removed from analysis
     
     Returns:
         {

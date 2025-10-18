@@ -182,9 +182,8 @@ class ChatAIAgent:
                 context_parts.append(
                     f"- {symbol}: {score:.2f} ({direction}) {trending}"
                 )
-                context_parts.append(f"  News: {data['sentiment_breakdown']['news']:.2f}, "
-                                    f"Reddit: {data['sentiment_breakdown']['reddit']:.2f}, "
-                                    f"StockTwits: {data['sentiment_breakdown']['stocktwits']:.2f}")
+                context_parts.append(f"  News Sentiment: {data['sentiment_breakdown']['news']:.2f}, "
+                                    f"Confidence: {data['confidence']:.2f}")
         
         return "\n".join(context_parts)
     

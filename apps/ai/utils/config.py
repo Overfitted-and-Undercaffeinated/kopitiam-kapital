@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     mem0_api_key: str
     elevenlabs_api_key: str
     alpha_vantage_api_key: Optional[str] = None
+    rapidapi_key: Optional[str] = None  # For StockTwits via RapidAPI
     
     # Reddit API (PRAW)
     client_id: Optional[str] = None  # Reddit client ID
@@ -43,15 +44,16 @@ class Settings(BaseSettings):
     # Testing Modes
     enable_api_calls: bool = True  # Set to False for testing without API calls
     use_mock_llm: bool = False  # Use mock LLM responses for testing
-    use_mock_market_data: bool = False  # Use mock market data
+    use_mock_market_data: bool = True  # Use mock market data
     use_mock_exa: bool = False  # Use REAL Exa.ai API (was mocked before)
+    stocktwits_enabled: bool = False  # StockTwits disabled (removed from sentiment analysis)
     
     # Advanced Features
     use_mem0: bool = True  # Use Mem0 for user memory and personalization
     use_mcp_risk_tools: bool = True  # Use MCP server for advanced risk calculations
     
     # Rate Limiting
-    enable_rate_limiting: bool = True
+    enable_rate_limiting: bool = False  # Disabled for development (Redis optional)
     exa_calls_per_hour: int = 500
     openai_calls_per_hour: int = 1000
     groq_calls_per_hour: int = 2000

@@ -8,6 +8,7 @@ interface KopiColt2DProps {
   step: number
   isIntro: boolean
   onIntroComplete?: () => void
+  customVoiceText?: string
   formData?: {
     riskProfile: string
     experienceLevel: string
@@ -16,7 +17,7 @@ interface KopiColt2DProps {
   }
 }
 
-export default function KopiColt2D({ expression, step, isIntro, onIntroComplete, formData = { riskProfile: '', experienceLevel: '', tradingCapital: '', primaryMarkets: [] } }: KopiColt2DProps) {
+export default function KopiColt2D({ expression, step, isIntro, onIntroComplete, customVoiceText, formData = { riskProfile: '', experienceLevel: '', tradingCapital: '', primaryMarkets: [] } }: KopiColt2DProps) {
   const [voiceText, setVoiceText] = useState('')
   const [isVisible, setIsVisible] = useState(false)
   const [position, setPosition] = useState({ bottom: -400, right: 80 })
@@ -68,30 +69,47 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
         setPosition({ bottom: centerY, right: window.innerWidth - centerX - 400 })
       }, 300)
       
-      // Show greeting
-      setTimeout(() => {
-        setVoiceText("Howdy, partner!")
-        const introText = "Howdy, partner! Welcome to Kopitiam Capital!"
-        playVoice(introText)
-      }, 800)
+      // Show greeting (only if no custom voice text is provided)
+      if (!customVoiceText) {
+        setTimeout(() => {
+          setVoiceText("Howdy, partner!")
+          const introText = "Howdy, partner! Welcome to Kopitiam Capital!"
+          playVoice(introText)
+        }, 800)
+      }
       
-      // Move to corner and shrink after 3 seconds
-      setTimeout(() => {
-        setIsCentered(false)
-        setSize({ width: 280, height: 280 })
-        setPosition({ bottom: 80, right: 80 })
-        setVoiceText('')
-      }, 3500)
-      
-      // Mark intro as complete
-      setTimeout(() => {
-        setHasPlayedIntro(true)
-      }, 4500)
+      // Move to corner and shrink after 3 seconds (only if not custom voice)
+      if (!customVoiceText) {
+        setTimeout(() => {
+          setIsCentered(false)
+          setSize({ width: 280, height: 280 })
+          setPosition({ bottom: 80, right: 80 })
+          setVoiceText('')
+        }, 3500)
+        
+        // Mark intro as complete
+        setTimeout(() => {
+          setHasPlayedIntro(true)
+        }, 4500)
+      } else {
+        // If custom voice text, stay centered and don't auto-move
+        setTimeout(() => {
+          setHasPlayedIntro(true)
+        }, 1000)
+      }
     } else if (!isIntro) {
       setIsVisible(true)
       setIsCentered(false)
     }
-  }, [isIntro, hasPlayedIntro, audioEnabled])
+  }, [isIntro, hasPlayedIntro, audioEnabled, customVoiceText])
+
+  // Handle custom voice text changes
+  useEffect(() => {
+    if (customVoiceText && isVisible && audioEnabled) {
+      setVoiceText(customVoiceText)
+      playVoice(customVoiceText)
+    }
+  }, [customVoiceText, isVisible, audioEnabled])
 
   // Keep position consistent across all steps after intro
   useEffect(() => {
@@ -202,6 +220,22 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
       })
 
       if (!response.ok) {
+        const errorData = await response.json()
+        
+        // If quota exceeded, just skip voice playback silently
+        if (errorData.error === 'quota_exceeded') {
+          console.warn('⚠️ Voice API quota exceeded, skipping voice playback')
+          setIsPlayingAudio(false)
+          // Simulate voice completion after a short delay
+          setTimeout(() => {
+            setVoiceText('')
+            if (text.includes("Howdy, partner!") && onIntroComplete) {
+              onIntroComplete()
+            }
+          }, 2000) // Keep speech bubble for 2 seconds
+          return
+        }
+        
         setIsPlayingAudio(false)
         return
       }
@@ -231,7 +265,9 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
         audioRef.current = null
       }
     } catch (error) {
+      console.error('Voice playback error:', error)
       setIsPlayingAudio(false)
+      // Continue without voice
       setTimeout(() => {
         setVoiceText('')
         if (text.includes("Howdy, partner!") && onIntroComplete) {

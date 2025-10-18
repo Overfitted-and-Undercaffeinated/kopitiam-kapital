@@ -18,7 +18,8 @@ class Trade:
         entry_date: datetime,
         stop: float,
         target: float,
-        direction: str = "BUY"
+        direction: str = "BUY",
+        shares: int = 1
     ):
         self.symbol = symbol
         self.entry_price = entry_price
@@ -26,11 +27,12 @@ class Trade:
         self.stop = stop
         self.target = target
         self.direction = direction
+        self.shares = shares  # Number of shares in position
         
         self.exit_price: Optional[float] = None
         self.exit_date: Optional[datetime] = None
-        self.pnl: Optional[float] = None
-        self.pnl_pct: Optional[float] = None
+        self.pnl: Optional[float] = None  # Total P&L in dollars
+        self.pnl_pct: Optional[float] = None  # Percentage return
         self.outcome: Optional[str] = None  # 'win', 'loss', 'breakeven'
 
 class BacktestEngine:
@@ -42,7 +44,8 @@ class BacktestEngine:
         start_date: str,
         end_date: str,
         strategy_fn: Callable,
-        initial_capital: float = 100000.0
+        initial_capital: float = 100000.0,
+        include_visuals: bool = True
     ) -> Dict:
         """
         Test a strategy on historical data
@@ -82,7 +85,7 @@ class BacktestEngine:
             trades = await self._simulate_trades(data, strategy_fn, initial_capital)
             
             # Calculate metrics
-            metrics = self._calculate_metrics(trades, initial_capital)
+            metrics = self._calculate_metrics(trades, initial_capital, include_visuals)
             
             logger.info(
                 f"Backtest complete: {metrics['num_trades']} trades, "
@@ -118,6 +121,12 @@ class BacktestEngine:
             signal = await strategy_fn(window)
             
             if signal and not current_position:
+                # Calculate position size based on signal
+                position_size_pct = signal.get('position_size_pct', 0.10)  # Default 10%
+                position_value = capital * position_size_pct
+                shares = int(position_value / current_price)
+                shares = max(1, shares)  # At least 1 share
+                
                 # Open new position
                 current_position = Trade(
                     symbol=data.index.name or 'UNKNOWN',
@@ -125,7 +134,8 @@ class BacktestEngine:
                     entry_date=current_date,
                     stop=signal.get('stop', current_price * 0.95),
                     target=signal.get('target', current_price * 1.10),
-                    direction=signal.get('direction', 'BUY')
+                    direction=signal.get('direction', 'BUY'),
+                    shares=shares
                 )
             
             elif current_position:
@@ -147,22 +157,27 @@ class BacktestEngine:
                 
                 # Calculate P&L if exited
                 if current_position.exit_price:
-                    current_position.pnl = (
-                        current_position.exit_price - current_position.entry_price
-                    )
-                    current_position.pnl_pct = (
-                        current_position.pnl / current_position.entry_price
-                    )
+                    # Per-share P&L
+                    pnl_per_share = current_position.exit_price - current_position.entry_price
+                    
+                    # Total P&L (multiply by shares)
+                    current_position.pnl = pnl_per_share * current_position.shares
+                    
+                    # Percentage return (same regardless of shares)
+                    current_position.pnl_pct = pnl_per_share / current_position.entry_price
+                    
+                    # Update capital with P&L
+                    capital += current_position.pnl
                     
                     trades.append(current_position)
                     current_position = None
         
         return trades
     
-    def _calculate_metrics(self, trades: List[Trade], initial_capital: float) -> Dict:
+    def _calculate_metrics(self, trades: List[Trade], initial_capital: float, include_visuals: bool = True) -> Dict:
         """Calculate performance metrics"""
         if not trades:
-            return {
+            metrics = {
                 'total_return': 0.0,
                 'total_return_pct': 0.0,
                 'win_rate': 0.0,
@@ -174,6 +189,14 @@ class BacktestEngine:
                 'losing_trades': 0,
                 'trades': []
             }
+            if include_visuals:
+                metrics['visuals'] = {
+                    'equity_curve': [],
+                    'drawdown_series': [],
+                    'monthly_returns': {},
+                    'trade_distribution': {'wins': 0, 'losses': 0}
+                }
+            return metrics
         
         # Basic metrics
         total_pnl = sum(t.pnl for t in trades if t.pnl)
@@ -190,11 +213,14 @@ class BacktestEngine:
         # Returns
         returns = [t.pnl_pct for t in trades if t.pnl_pct]
         
-        # Sharpe ratio (simplified)
-        if returns:
+        # Sharpe ratio
+        # Note: This is a simplified calculation using per-trade returns
+        # For proper Sharpe, we'd need daily portfolio returns
+        if returns and len(returns) > 1:
             avg_return = sum(returns) / len(returns)
             std_return = pd.Series(returns).std()
-            sharpe_ratio = (avg_return / std_return) * (252 ** 0.5) if std_return > 0 else 0.0
+            # Calculate Sharpe based on per-trade returns (no annualization)
+            sharpe_ratio = avg_return / std_return if std_return > 0 else 0.0
         else:
             sharpe_ratio = 0.0
         
@@ -208,7 +234,7 @@ class BacktestEngine:
         drawdown = (equity_series - running_max) / running_max
         max_drawdown = drawdown.min()
         
-        return {
+        metrics = {
             'total_return': total_pnl,
             'total_return_pct': total_pnl / initial_capital,
             'win_rate': win_rate,
@@ -222,6 +248,101 @@ class BacktestEngine:
             'avg_loss': gross_loss / len(losing_trades) if losing_trades else 0,
             'trades': [self._trade_to_dict(t) for t in trades]
         }
+        
+        # Add visual data if requested
+        if include_visuals:
+            equity_curve_data = self._generate_equity_curve(trades, initial_capital)
+            metrics['visuals'] = {
+                'equity_curve': equity_curve_data,
+                'drawdown_series': self._generate_drawdown_series(equity_curve_data),
+                'monthly_returns': self._generate_monthly_returns(trades),
+                'trade_distribution': {
+                    'wins': len(winning_trades),
+                    'losses': len(losing_trades)
+                }
+            }
+        
+        return metrics
+    
+    def _generate_equity_curve(self, trades: List[Trade], initial_capital: float) -> List[Dict]:
+        """
+        Generate equity curve data for visualization
+        
+        Returns list of {date, equity, trade_pnl} for charting
+        """
+        equity_curve = []
+        current_equity = initial_capital
+        
+        # Add starting point
+        if trades:
+            equity_curve.append({
+                'date': trades[0].entry_date.isoformat() if trades[0].entry_date else None,
+                'equity': current_equity,
+                'trade_pnl': 0
+            })
+        
+        # Add each trade exit
+        for trade in trades:
+            if trade.exit_date and trade.pnl is not None:
+                current_equity += trade.pnl
+                equity_curve.append({
+                    'date': trade.exit_date.isoformat(),
+                    'equity': current_equity,
+                    'trade_pnl': trade.pnl
+                })
+        
+        return equity_curve
+    
+    def _generate_drawdown_series(self, equity_curve: List[Dict]) -> List[Dict]:
+        """
+        Calculate drawdown over time for visualization
+        
+        Drawdown shows the decline from peak equity
+        """
+        if not equity_curve:
+            return []
+        
+        drawdown_series = []
+        peak_equity = equity_curve[0]['equity']
+        
+        for point in equity_curve:
+            equity = point['equity']
+            
+            # Update peak
+            if equity > peak_equity:
+                peak_equity = equity
+            
+            # Calculate drawdown as percentage from peak
+            drawdown = (equity - peak_equity) / peak_equity if peak_equity > 0 else 0
+            
+            drawdown_series.append({
+                'date': point['date'],
+                'drawdown': drawdown,
+                'equity': equity,
+                'peak': peak_equity
+            })
+        
+        return drawdown_series
+    
+    def _generate_monthly_returns(self, trades: List[Trade]) -> Dict:
+        """
+        Group returns by month for heatmap visualization
+        
+        Returns dict with 'YYYY-MM' keys and percentage returns
+        """
+        monthly_returns = {}
+        
+        for trade in trades:
+            if trade.exit_date and trade.pnl_pct is not None:
+                # Format as YYYY-MM
+                month_key = trade.exit_date.strftime('%Y-%m')
+                
+                # Accumulate returns for the month
+                if month_key not in monthly_returns:
+                    monthly_returns[month_key] = 0
+                monthly_returns[month_key] += trade.pnl_pct
+        
+        return monthly_returns
     
     def _trade_to_dict(self, trade: Trade) -> Dict:
         """Convert Trade object to dict"""
@@ -233,6 +354,7 @@ class BacktestEngine:
             'exit_date': trade.exit_date.isoformat() if trade.exit_date else None,
             'stop': trade.stop,
             'target': trade.target,
+            'shares': trade.shares,
             'pnl': trade.pnl,
             'pnl_pct': trade.pnl_pct,
             'outcome': trade.outcome

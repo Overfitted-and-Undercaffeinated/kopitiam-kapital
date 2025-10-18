@@ -73,6 +73,10 @@ class MorningBriefAgent:
         """
         logger.info(f"Generating morning brief for {user_id}, watchlist: {watchlist}, market: {market}")
         
+        # Validate watchlist
+        if not watchlist or len(watchlist) == 0:
+            raise ValueError("Watchlist cannot be empty. Please provide at least one symbol.")
+        
         try:
             # Step 1: Get user profile from Mem0
             user_policy = await mem0_service.get_policy(user_id)

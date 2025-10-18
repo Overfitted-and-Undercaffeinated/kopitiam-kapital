@@ -15,19 +15,6 @@ interface Message {
   detailedResponse?: string // Detailed text not read aloud
   userMessage?: string
   timestamp: Date
-  metadata?: {
-    chart_data?: Array<{
-      symbol: string
-      equity_curve: Array<{
-        date: string
-        equity: number
-        trade_pnl: number
-      }>
-    }>
-    intent?: string
-    symbols?: string[]
-    [key: string]: any
-  }
 }
 
 export default function AssistantPage() {
@@ -111,23 +98,25 @@ export default function AssistantPage() {
     }
   }
 
-  const fetchRealAIResponse = async (userQuestion: string): Promise<{ short: string; detailed: string; metadata?: any }> => {
+  const fetchRealAIResponse = async (userQuestion: string): Promise<{ short: string; detailed: string }> => {
     const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
     const userId = localStorage.getItem('userId') || 'demo_user'
     
     try {
-      console.log('🤖 Calling AI Chat Assistant:', { message: userQuestion, userId })
+      console.log('🤖 Calling AI Orchestrator:', { query: userQuestion, userId })
       
-      // Use URLSearchParams for form data
-      const params = new URLSearchParams({
-        message: userQuestion,
-        user_id: userId,
-      })
-      
-      const response = await fetch(`${AI_API_URL}/assistant/chat?${params}`, {
+      const response = await fetch(`${AI_API_URL}/ai/orchestrate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(60000) // 60 second timeout for backtests
+        body: JSON.stringify({
+          query: userQuestion,
+          user_id: userId,
+          context: {
+            userName: userName,
+            timestamp: new Date().toISOString()
+          }
+        }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       })
       
       if (!response.ok) {
@@ -137,12 +126,15 @@ export default function AssistantPage() {
       const data = await response.json()
       console.log('✅ AI Response received:', data)
       
-      // Extract response from new chat orchestrator format
-      const short = data.short_response || data.shortResponse || 'No response'
-      const detailed = data.detailed_response || data.detailedResponse || 'No detailed response'
-      const metadata = data.metadata || {}
+      // Extract response text - the orchestrator returns a response field
+      const responseText = data.response || data.text || data.message || 'No response from AI'
       
-      return { short, detailed, metadata }
+      // Split response into short (first paragraph) and detailed (full text)
+      const paragraphs = responseText.split('\n\n').filter((p: string) => p.trim().length > 0)
+      const short = paragraphs[0] || responseText.substring(0, 200)
+      const detailed = responseText
+      
+      return { short, detailed }
       
     } catch (error) {
       console.error('❌ AI API Error:', error)
@@ -150,8 +142,7 @@ export default function AssistantPage() {
       // Fallback to a friendly error message
       return {
         short: `Whoa there, ${userName}! My AI brain's takin' a coffee break. Let me give ya what I remember...`,
-        detailed: `I'm havin' trouble connectin' to the main AI engine right now, partner. This might be because:\n\n• The backend server isn't runnin' (try: cd apps/ai && uvicorn main:app --reload)\n• Network connection issues\n• API timeout (backtests can take 30-60 seconds)\n\nIn the meantime, here's what I can do:\n\n• Backtest trading strategies on historical data\n• Analyze sentiment from multiple sources (news, social media)\n• Generate trading recommendations\n• Explain trading concepts\n• Research market trends\n\nTry askin' me again in a moment, or check that the AI backend is runnin'!`,
-        metadata: {}
+        detailed: `I'm havin' trouble connectin' to the main AI engine right now, partner. This might be because:\n\n• The backend server isn't runnin' (try: cd apps/ai && uvicorn main:app --reload)\n• Network connection issues\n• API timeout (your question might need more thinkin' time)\n\nIn the meantime, here's some general advice:\n\n• For stock recommendations, I typically analyze sentiment from multiple sources (news, Reddit, social media)\n• I run backtests to validate strategies before recommendin' 'em\n• I personalize recommendations based on your risk profile in Mem0\n\nTry askin' me again in a moment, or check that the AI backend is runnin'!`
       }
     }
   }
@@ -181,7 +172,6 @@ export default function AssistantPage() {
       role: 'assistant',
       shortResponse: response.short,
       detailedResponse: response.detailed,
-      metadata: response.metadata,
       timestamp: new Date()
     }
     setMessages(prev => [...prev, assistantMsg])
@@ -373,10 +363,10 @@ export default function AssistantPage() {
                     </p>
                     <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto">
                       {[
-                        'Backtest mean reversion on AAPL',
-                        'Should I buy NVDA?',
-                        'What\'s the sentiment on TSLA?',
-                        'Explain RSI to me'
+                        'Should I buy DBS?',
+                        'How\'s my portfolio doing?',
+                        'What\'s the market outlook?',
+                        'Tell me about Apple stock'
                       ].map((suggestion) => (
                         <motion.button
                           key={suggestion}
@@ -419,108 +409,10 @@ export default function AssistantPage() {
                       {message.detailedResponse && (
                         <div className="bg-[#FAFAF9] rounded-2xl px-5 py-4 border border-[#E5E5E5]">
                           <div className="prose prose-sm max-w-none">
-                            <div 
-                              className="font-sans text-[#4A3F35] text-sm leading-relaxed"
-                              dangerouslySetInnerHTML={{ 
-                                __html: message.detailedResponse.replace(/\n/g, '<br>') 
-                              }}
-                            />
+                            <pre className="whitespace-pre-wrap font-sans text-[#4A3F35] text-sm leading-relaxed">
+                              {message.detailedResponse}
+                            </pre>
                           </div>
-                        </div>
-                      )}
-
-                      {/* PnL Charts (if backtest data) */}
-                      {message.metadata?.chart_data && message.metadata.chart_data.length > 0 && (
-                        <div className="space-y-4">
-                          {message.metadata.chart_data.map((chartData: any, chartIdx: number) => (
-                            <div key={chartIdx} className="bg-white rounded-2xl p-5 border border-[#E5E5E5] shadow-sm">
-                              <h4 className="text-lg font-bold text-[#2F1810] mb-4">
-                                📈 {chartData.symbol} - Equity Curve
-                              </h4>
-                              <div className="relative h-64 w-full">
-                                <svg viewBox="0 0 800 300" className="w-full h-full">
-                                  {/* Chart rendering */}
-                                  {(() => {
-                                    const points = chartData.equity_curve || []
-                                    if (points.length < 2) return null
-                                    
-                                    const maxEquity = Math.max(...points.map((p: any) => p.equity))
-                                    const minEquity = Math.min(...points.map((p: any) => p.equity))
-                                    const equityRange = maxEquity - minEquity || 1
-                                    
-                                    const xStep = 780 / (points.length - 1)
-                                    const yScale = 260 / equityRange
-                                    
-                                    // Create path
-                                    const pathData = points.map((point: any, i: number) => {
-                                      const x = 10 + i * xStep
-                                      const y = 290 - ((point.equity - minEquity) * yScale)
-                                      return i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`
-                                    }).join(' ')
-                                    
-                                    return (
-                                      <>
-                                        {/* Grid lines */}
-                                        <line x1="10" y1="30" x2="10" y2="290" stroke="#E5E5E5" strokeWidth="2" />
-                                        <line x1="10" y1="290" x2="790" y2="290" stroke="#E5E5E5" strokeWidth="2" />
-                                        
-                                        {/* Equity line */}
-                                        <path
-                                          d={pathData}
-                                          fill="none"
-                                          stroke="#8B7355"
-                                          strokeWidth="3"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        />
-                                        
-                                        {/* Points */}
-                                        {points.map((point: any, i: number) => {
-                                          const x = 10 + i * xStep
-                                          const y = 290 - ((point.equity - minEquity) * yScale)
-                                          const color = point.trade_pnl > 0 ? '#22c55e' : point.trade_pnl < 0 ? '#ef4444' : '#8B7355'
-                                          return (
-                                            <circle
-                                              key={i}
-                                              cx={x}
-                                              cy={y}
-                                              r="4"
-                                              fill={color}
-                                              stroke="white"
-                                              strokeWidth="2"
-                                            />
-                                          )
-                                        })}
-                                        
-                                        {/* Labels */}
-                                        <text x="10" y="20" fontSize="12" fill="#6B5D52" fontWeight="bold">
-                                          ${maxEquity.toLocaleString()}
-                                        </text>
-                                        <text x="10" y="305" fontSize="12" fill="#6B5D52" fontWeight="bold">
-                                          ${minEquity.toLocaleString()}
-                                        </text>
-                                      </>
-                                    )
-                                  })()}
-                                </svg>
-                              </div>
-                              <div className="mt-4 flex items-center justify-between text-xs text-[#6B5D52]">
-                                <div className="flex items-center gap-4">
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                    <span>Winning Trade</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                    <span>Losing Trade</span>
-                                  </div>
-                                </div>
-                                <div className="font-medium">
-                                  {chartData.equity_curve?.length || 0} data points
-                                </div>
-                              </div>
-                            </div>
-                          ))}
                         </div>
                       )}
                     </div>

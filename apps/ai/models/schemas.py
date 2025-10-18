@@ -50,6 +50,12 @@ class RouterResponse(BaseModel):
                 seen.add(entity)
         return cleaned
 
+class OrchestrateRequest(BaseModel):
+    """Request schema for AI orchestration endpoint"""
+    query: str = Field(..., min_length=1, max_length=1000, description="User's natural language query")
+    user_id: str = Field(..., description="User ID for personalization and tracking")
+    context: Optional[dict] = Field(None, description="Optional context dictionary with additional information")
+
 # ============================================================================
 # TRADING SCHEMAS
 # ============================================================================

@@ -104,7 +104,7 @@ class OrchestratorAgent:
     
     async def _handle_recommend(
         self,
-        entities: Dict,
+        entities: list,
         user_id: str,
         context: Optional[Dict]
     ) -> Dict:
@@ -113,7 +113,8 @@ class OrchestratorAgent:
         
         Flow: Sentiment → Backtest → Recommendation
         """
-        symbols = entities.get('symbols', [])
+        # entities is a list of extracted symbols from router
+        symbols = entities if isinstance(entities, list) else []
         
         if not symbols:
             return {
@@ -140,7 +141,7 @@ class OrchestratorAgent:
     
     async def _handle_research(
         self,
-        entities: Dict,
+        entities: list,
         user_id: str,
         context: Optional[Dict]
     ) -> Dict:
@@ -149,7 +150,8 @@ class OrchestratorAgent:
         
         Flow: Sentiment → RAG Pipeline → Summary
         """
-        symbols = entities.get('symbols', [])
+        # entities is a list of extracted symbols from router
+        symbols = entities if isinstance(entities, list) else []
         
         if not symbols:
             return {
@@ -175,7 +177,7 @@ class OrchestratorAgent:
             'symbol': symbol,
             'result': {
                 'sentiment': sentiment,
-                'analysis': f"Comprehensive analysis for {symbol} based on {sentiment['volume']['news_articles']} articles and {sentiment['volume']['reddit_mentions'] + sentiment['volume']['stocktwits_messages']} social mentions.",
+                'analysis': f"Comprehensive sentiment analysis for {symbol} based on {sentiment['volume']['news_articles']} news articles.",
                 'recommendation': 'See /ai/recommend for trading recommendation'
             }
         }
@@ -205,7 +207,7 @@ class OrchestratorAgent:
     async def _handle_alerts(
         self,
         user_id: str,
-        entities: Dict,
+        entities: list,
         context: Optional[Dict]
     ) -> Dict:
         """
@@ -215,17 +217,21 @@ class OrchestratorAgent:
         """
         logger.info(f"Alerts request for user {user_id}")
         
+        # entities is a list of extracted symbols from router
+        symbols = entities if isinstance(entities, list) else []
+        
         return {
             'intent': 'ALERTS',
             'result': {
                 'message': 'Alerts feature coming soon',
+                'symbols': symbols,
                 'active_alerts': []
             }
         }
     
     async def _handle_explain(
         self,
-        entities: Dict,
+        entities: list,
         user_id: str,
         context: Optional[Dict]
     ) -> Dict:
@@ -234,7 +240,10 @@ class OrchestratorAgent:
         
         Provides educational explanations
         """
-        topic = entities.get('topic', 'general')
+        # entities is a list of extracted topics/concepts from router
+        # For explain, entities might contain trading terms (RSI, MACD, etc.)
+        topics = entities if isinstance(entities, list) else []
+        topic = topics[0] if topics else 'general trading'
         
         logger.info(f"Explanation request: {topic}")
         
@@ -242,7 +251,8 @@ class OrchestratorAgent:
             'intent': 'EXPLAIN',
             'result': {
                 'message': 'Explainer feature coming soon',
-                'topic': topic
+                'topic': topic,
+                'entities': topics
             }
         }
 
