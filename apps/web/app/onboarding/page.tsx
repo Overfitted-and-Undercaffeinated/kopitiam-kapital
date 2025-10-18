@@ -28,6 +28,8 @@ export default function OnboardingPage() {
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 })
   const [kopiExpression, setKopiExpression] = useState<'neutral' | 'concerned' | 'impressed' | 'happy'>('neutral')
   const [showKopi, setShowKopi] = useState(false)
+  const [showStartOverlay, setShowStartOverlay] = useState(true)
+  const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -123,8 +125,40 @@ export default function OnboardingPage() {
     }
   }
 
+  const handleStart = () => {
+    setShowStartOverlay(false)
+    setShowKopi(true)
+  }
+
   return (
     <div className="min-h-screen bg-[#FFF8DC] relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
+      {/* Start Overlay */}
+      <AnimatePresence>
+        {showStartOverlay && (
+          <motion.div
+            className="fixed inset-0 bg-[#FFF8DC] flex items-center justify-center z-50 cursor-pointer"
+            onClick={handleStart}
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <motion.div
+              className="text-center space-y-4"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h2 className="text-7xl font-bold text-[#2F1810]" style={{ fontFamily: 'var(--font-bowlby)' }}>
+                Let's get you started
+              </h2>
+              <p className="text-xl text-[#8B4513] font-medium">
+                click anywhere to continue
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Kopi Colt - 3D Cowboy */}
       <AnimatePresence>
         {showKopi && (
@@ -133,6 +167,7 @@ export default function OnboardingPage() {
             cursorPosition={cursorPosition}
             step={step}
             isIntro={step === 1 && showKopi}
+            onIntroComplete={() => setShowForm(true)}
           />
         )}
       </AnimatePresence>
@@ -148,9 +183,10 @@ export default function OnboardingPage() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-20 max-w-2xl">
-        <AnimatePresence mode="wait">
-          {step === 1 && (
+      {showForm && (
+        <div className="container mx-auto px-4 py-20 max-w-2xl">
+          <AnimatePresence mode="wait">
+            {step === 1 && (
             <motion.div
               key="step1"
               initial={{ opacity: 0, x: 50 }}
@@ -448,43 +484,45 @@ export default function OnboardingPage() {
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
+          </AnimatePresence>
 
-        {/* Navigation Buttons */}
-        <motion.div
-          className="flex justify-between mt-12"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          {step > 1 && (
+          {/* Navigation Buttons */}
+          <motion.div
+            className="flex justify-between mt-12"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            {step > 1 && (
+              <motion.button
+                onClick={handleBack}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 rounded-xl border-2 border-[#CD853F] text-[#8B4513] font-bold text-lg hover:bg-[#CD853F] hover:text-white transition-colors"
+              >
+                Back
+              </motion.button>
+            )}
             <motion.button
-              onClick={handleBack}
+              onClick={handleNext}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 rounded-xl border-2 border-[#CD853F] text-[#8B4513] font-bold text-lg hover:bg-[#CD853F] hover:text-white transition-colors"
+              disabled={!canProceed()}
+              className={`px-8 py-4 rounded-xl font-bold text-lg transition-colors ${
+                step === 1 ? 'ml-auto' : ''
+              } ${
+                canProceed()
+                  ? 'bg-[#8B4513] text-white hover:bg-[#A0522D]'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             >
-              Back
+              {step === 4 ? "Let's Ride!" : 'Next'}
             </motion.button>
-          )}
-          <motion.button
-            onClick={handleNext}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            disabled={!canProceed()}
-            className={`px-8 py-4 rounded-xl font-bold text-lg transition-colors ${
-              step === 1 ? 'ml-auto' : ''
-            } ${
-              canProceed()
-                ? 'bg-[#8B4513] text-white hover:bg-[#A0522D]'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {step === 4 ? "Let's Ride!" : 'Next'}
-          </motion.button>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }
+
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 
 interface CowboySceneProps {
@@ -10,9 +10,15 @@ interface CowboySceneProps {
 
 export default function CowboyScene({ expression, cursorPosition }: CowboySceneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    if (!containerRef.current) return
+    setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isMounted || !containerRef.current) return
+    if (typeof window === 'undefined') return
 
     // Scene setup
     const scene = new THREE.Scene()

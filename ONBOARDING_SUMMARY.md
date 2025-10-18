@@ -189,3 +189,4 @@ The form collects data matching your Supabase schema:
 
 Enjoy your new onboarding experience with Kopi Colt!
 
+

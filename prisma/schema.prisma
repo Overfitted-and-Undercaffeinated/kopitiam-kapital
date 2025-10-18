@@ -1,0 +1,197 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String            @id @default(uuid()) @db.Uuid
+  email                 String            @unique
+  name                  String?
+  riskProfile           RiskProfile       @default(MODERATE) @map("risk_profile")
+  experienceLevel       ExperienceLevel   @default(INTERMEDIATE) @map("explanation_level")
+  tradingCapitalRange   TradingCapital?   @map("trading_capital_range")
+  primaryMarkets        String[]          @map("primary_markets") @db.Text
+  briefTime             String?           @map("brief_time")
+  preferredVoice        String            @default("default") @map("preferred_voice")
+  timezone              String            @default("Asia/Singapore")
+  language              String            @default("en")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  
+  // Relations
+  positions             Position[]
+  recommendations       Recommendation[]
+  pnlSnapshots          PnlSnapshot[]      @relation("UserPnLSnapshots")
+  notes                 Note[]
+  watchlist             UserWatchlist[]
+
+  @@map("users")
+}
+
+model UserWatchlist {
+  id           String      @id @default(uuid()) @db.Uuid
+  userId       String      @map("user_id") @db.Uuid
+  instrumentId String      @map("instrument_id") @db.Uuid
+  addedAt      DateTime    @default(now()) @map("added_at")
+  
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instrument   Instrument  @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instrumentId])
+  @@map("user_watchlist")
+}
+
+model Instrument {
+  id               String            @id @default(uuid()) @db.Uuid
+  symbol           String            @unique
+  name             String
+  mic              String?
+  assetClass       AssetClass?       @map("asset_class")
+  tickSize         Decimal?          @map("tick_size") @db.Decimal
+  lotSize          Int               @default(1) @map("lot_size")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  
+  positions        Position[]
+  recommendations  Recommendation[]
+  events           Event[]
+  notes            Note[]
+  watchlists       UserWatchlist[]
+
+  @@map("instruments")
+}
+
+model Position {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  instrumentId String    @map("instrument_id") @db.Uuid
+  qty          Decimal   @db.Decimal
+  avgPrice     Decimal   @map("avg_price") @db.Decimal
+  stop         Decimal?  @db.Decimal
+  target       Decimal?  @db.Decimal
+  tags         String[]  @db.Text
+  openedAt     DateTime  @default(now()) @map("opened_at")
+  closedAt     DateTime? @map("closed_at")
+  pnl          Decimal?  @db.Decimal
+  
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+
+  @@index([userId])
+  @@index([userId, closedAt])
+  @@map("positions")
+}
+
+model Recommendation {
+  id           String     @id @default(uuid()) @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  instrumentId String     @map("instrument_id") @db.Uuid
+  action       Action
+  entry        Decimal    @db.Decimal
+  stop         Decimal    @db.Decimal
+  tp           Decimal    @db.Decimal
+  sizePctNav   Decimal    @map("size_pct_nav") @db.Decimal
+  thesis       String
+  risks        String
+  confidence   Decimal    @db.Decimal
+  sources      Json?
+  accepted     Boolean    @default(false)
+  outcomePnl   Decimal?   @map("outcome_pnl") @db.Decimal
+  ts           DateTime   @default(now())
+  
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+
+  @@index([userId, ts(sort: Desc)])
+  @@map("recommendations")
+}
+
+model Event {
+  id           String      @id @default(uuid()) @db.Uuid
+  instrumentId String?     @map("instrument_id") @db.Uuid
+  type         EventType
+  payloadJson  Json        @map("payload_json")
+  ts           DateTime    @default(now())
+  
+  instrument   Instrument? @relation(fields: [instrumentId], references: [id])
+
+  @@index([instrumentId, ts(sort: Desc)])
+  @@index([type, ts(sort: Desc)])
+  @@map("events")
+}
+
+model PnlSnapshot {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  ts           DateTime @default(now())
+  totalPnl     Decimal  @map("total_pnl") @db.Decimal
+  jsonBySymbol Json     @map("json_by_symbol")
+  
+  user         User     @relation("UserPnLSnapshots", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, ts(sort: Desc)])
+  @@map("pnl_snapshots")
+}
+
+model Note {
+  id           String      @id @default(uuid()) @db.Uuid
+  userId       String?     @map("user_id") @db.Uuid
+  instrumentId String?     @map("instrument_id") @db.Uuid
+  chunk        String
+  source       String?
+  ts           DateTime    @default(now())
+  
+  user         User?       @relation(fields: [userId], references: [id])
+  instrument   Instrument? @relation(fields: [instrumentId], references: [id])
+
+  @@index([userId, instrumentId])
+  @@map("notes")
+}
+
+// Enums
+enum RiskProfile {
+  CONSERVATIVE  @map("Conservative")
+  MODERATE      @map("Moderate")
+  AGGRESSIVE    @map("Aggressive")
+}
+
+enum ExperienceLevel {
+  BEGINNER      @map("beginner")
+  INTERMEDIATE  @map("intermediate")
+  EXPERT        @map("expert")
+}
+
+enum TradingCapital {
+  UNDER_10K     @map("<10K")
+  TEN_TO_50K    @map("10K-50K")
+  FIFTY_TO_100K @map("50K-100K")
+  OVER_100K     @map("100K+")
+}
+
+enum AssetClass {
+  EQUITY    @map("equity")
+  COMMODITY @map("commodity")
+  FOREX     @map("forex")
+  CRYPTO    @map("crypto")
+  ETF       @map("etf")
+}
+
+enum Action {
+  BUY
+  SELL
+  HOLD
+}
+
+enum EventType {
+  PRICE    @map("price")
+  NEWS     @map("news")
+  ECON     @map("econ")
+  ALERT    @map("alert")
+  EARNINGS @map("earnings")
+}
+

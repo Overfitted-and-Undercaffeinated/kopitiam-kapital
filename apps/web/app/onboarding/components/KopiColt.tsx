@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import dynamic from 'next/dynamic'
 
@@ -18,28 +18,44 @@ interface KopiColtProps {
   cursorPosition: { x: number; y: number }
   step: number
   isIntro: boolean
+  onIntroComplete?: () => void
 }
 
-export default function KopiColt({ expression, cursorPosition, step, isIntro }: KopiColtProps) {
+export default function KopiColt({ expression, cursorPosition, step, isIntro, onIntroComplete }: KopiColtProps) {
   const [voiceText, setVoiceText] = useState('')
   const [isVisible, setIsVisible] = useState(false)
   const [position, setPosition] = useState({ bottom: -400, right: 80 })
+  const [hasPlayedIntro, setHasPlayedIntro] = useState(false)
+  const [lastExpression, setLastExpression] = useState('')
+  const [audioEnabled, setAudioEnabled] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const pendingVoiceRef = useRef<string | null>(null)
+
+  // Enable audio immediately when component mounts (user has already interacted with start screen)
+  useEffect(() => {
+    console.log('🎤 Enabling audio on component mount')
+    setAudioEnabled(true)
+  }, [])
 
   useEffect(() => {
-    if (isIntro) {
+    if (isIntro && !hasPlayedIntro && audioEnabled) {
+      console.log('🎬 Starting intro sequence, audioEnabled:', audioEnabled)
       // Intro animation
       setTimeout(() => setIsVisible(true), 500)
       setTimeout(() => {
         setVoiceText("Howdy, partner!")
-        playVoice("Howdy, partner! Welcome to Kopitiam Capital!")
+        const introText = "Howdy, partner! Welcome to Kopitiam Capital!"
+        console.log('📢 About to play intro voice')
+        playVoice(introText)
+        setHasPlayedIntro(true)
       }, 1500)
       setTimeout(() => {
         setPosition({ bottom: 120, right: 80 })
       }, 3000)
-    } else {
+    } else if (!isIntro) {
       setIsVisible(true)
     }
-  }, [isIntro])
+  }, [isIntro, hasPlayedIntro, audioEnabled])
 
   // Update position based on step
   useEffect(() => {
@@ -53,43 +69,100 @@ export default function KopiColt({ expression, cursorPosition, step, isIntro }: 
 
   // Voice lines for different steps
   useEffect(() => {
+    const expressionKey = `${step}-${expression}`
+    
+    // Only play if this is a new expression change
+    if (expressionKey === lastExpression) return
+    
     if (step === 2 && expression === 'concerned') {
+      setLastExpression(expressionKey)
       setVoiceText("Aggressive, eh? Bold choice!")
       playVoice("Aggressive, eh? That's a bold choice, partner!")
     } else if (step === 2 && expression === 'impressed') {
+      setLastExpression(expressionKey)
       setVoiceText("Big capital, big opportunity!")
       playVoice("That's some serious capital you're working with, partner!")
     } else if (step === 4 && expression === 'happy') {
+      setLastExpression(expressionKey)
       setVoiceText("You're all set, partner!")
       playVoice("You're all set, partner! Let's ride!")
     }
-  }, [step, expression])
+  }, [step, expression, lastExpression])
+
+  const enableAudio = () => {
+    setAudioEnabled(true)
+    // Play pending voice if any
+    if (pendingVoiceRef.current) {
+      playVoice(pendingVoiceRef.current)
+      pendingVoiceRef.current = null
+    }
+  }
 
   const playVoice = async (text: string) => {
+    console.log('🎵 playVoice called with audioEnabled:', audioEnabled)
+    if (!audioEnabled) {
+      console.log('⏸️ Audio not enabled yet, waiting for user interaction')
+      pendingVoiceRef.current = text
+      return
+    }
+    
     try {
+      // Stop any currently playing audio
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      
+      console.log('🔊 Attempting to generate voice for:', text)
+      
       const response = await fetch('/api/voice/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voice: 'cowboy' })
       })
 
+      console.log('📡 Voice API response status:', response.status)
+
       if (!response.ok) {
-        console.warn('Voice generation failed, showing text only')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.warn('❌ Voice generation failed:', errorData)
         return
       }
 
       const audioBlob = await response.blob()
+      console.log('🎵 Audio blob received, size:', audioBlob.size, 'bytes')
+      
       const audioUrl = URL.createObjectURL(audioBlob)
       const audio = new Audio(audioUrl)
+      audioRef.current = audio
       
-      await audio.play()
+      // Add volume
+      audio.volume = 1.0
+      
+      console.log('▶️ Attempting to play audio...')
+      
+      try {
+        await audio.play()
+        console.log('✅ Audio playing successfully!')
+      } catch (playError: any) {
+        console.error('🚫 Autoplay blocked or play failed:', playError.message)
+        console.log('💡 User needs to interact with page first for audio to play')
+      }
       
       // Clear voice text after audio finishes
       audio.onended = () => {
-        setTimeout(() => setVoiceText(''), 1000)
+        console.log('🏁 Audio finished playing')
+        setTimeout(() => {
+          setVoiceText('')
+          // If this is the intro voice, trigger form to appear
+          if (text.includes("Howdy, partner!") && onIntroComplete) {
+            onIntroComplete()
+          }
+        }, 1000)
+        audioRef.current = null
       }
-    } catch (error) {
-      console.error('Voice error:', error)
+    } catch (error: any) {
+      console.error('❌ Voice error:', error.message || error)
       // Fallback: just show text without audio
       setTimeout(() => setVoiceText(''), 4000)
     }
