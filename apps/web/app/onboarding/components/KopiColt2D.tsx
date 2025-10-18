@@ -110,6 +110,7 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
 
   // Handle custom voice text changes
   useEffect(() => {
+    console.log('Custom voice effect triggered:', { customVoiceText, isVisible, audioEnabled })
     if (customVoiceText && isVisible && audioEnabled) {
       console.log('Playing custom voice:', customVoiceText)
       setVoiceText(customVoiceText)
@@ -612,6 +613,7 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
       </motion.div>
 
       {/* Speech Bubble */}
+      {console.log('Rendering speech bubble:', voiceText)}
       {voiceText && (
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
