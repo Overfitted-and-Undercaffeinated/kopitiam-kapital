@@ -49,3 +49,4 @@ class HTTPClientManager:
 # Global singleton instance
 http_client_manager = HTTPClientManager()
 
+

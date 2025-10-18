@@ -651,6 +651,96 @@ async def get_strategy_template(template_id: str):
         logger.error(f"Error getting template: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/strategy/build")
+async def build_strategy_from_description(
+    description: str,
+    symbol: str = None
+):
+    """
+    Build a backtestable strategy from natural language description
+    
+    Uses Groq LLM to interpret the strategy description and generate JSON rules.
+    This endpoint is ideal for chat UI integration - users describe strategies
+    in plain English and get back executable strategy JSON.
+    
+    Args:
+        description: Natural language strategy description
+            Examples:
+            - "Buy when RSI is below 30"
+            - "Buy when price breaks above 20-day moving average"
+            - "MACD crossover strategy"
+            - "Buy on Bollinger band breakout"
+        symbol: Optional stock ticker for context
+    
+    Returns:
+        Strategy JSON object:
+        {
+            "name": "Strategy Name",
+            "description": "What it does",
+            "category": "Trend Following|Mean Reversion|Momentum|Breakout|Other",
+            "difficulty": "Beginner|Intermediate|Advanced",
+            "indicators": [...],
+            "entry_rules": [...],
+            "exit_rules": [...],
+            "position_sizing": {...},
+            "risk_management": {...}
+        }
+        
+    Error Response:
+        {
+            "detail": "Error message with suggestion for refinement"
+        }
+    
+    Examples:
+        POST /strategy/build
+        {
+            "description": "Buy when RSI drops below 30 and sell when it goes above 70",
+            "symbol": "AAPL"
+        }
+        
+        POST /strategy/build
+        {
+            "description": "trend following: buy on MACD bullish crossover, exit on bearish crossover"
+        }
+    """
+    try:
+        if not description or not description.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Strategy description cannot be empty. Please describe a trading strategy."
+            )
+        
+        from agents.strategy_translator import strategy_translator
+        
+        logger.info(f"Building strategy: {description[:80]}... (symbol: {symbol})")
+        
+        # Translate natural language to strategy JSON
+        strategy_dict = await strategy_translator.translate_strategy(
+            natural_language=description,
+            symbol=symbol
+        )
+        
+        logger.info(f"Strategy built successfully: '{strategy_dict['name']}'")
+        
+        return {
+            "success": True,
+            "strategy": strategy_dict,
+            "message": f"Strategy '{strategy_dict['name']}' built successfully and ready to backtest!"
+        }
+        
+    except ValueError as e:
+        logger.warning(f"Strategy build validation error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not build strategy: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error building strategy: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to build strategy: {str(e)}"
+        )
+
 @app.post("/backtest/run")
 async def run_backtest(
     symbol: str,
