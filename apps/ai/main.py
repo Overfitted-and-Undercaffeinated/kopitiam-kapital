@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Dict
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 # Load environment variables from project root
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -369,6 +370,32 @@ async def assistant_chat(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to process chat message: {str(e)}"
+        )
+
+@app.post("/assistant/debug-nlp")
+async def debug_nlp(message: str):
+    """
+    Debug endpoint to test NLP intent detection
+    """
+    try:
+        from agents.chat_orchestrator import chat_orchestrator
+        
+        logger.info(f"Debug NLP for message: '{message}'")
+        
+        # Test the analysis directly
+        analysis = await chat_orchestrator._analyze_message(message)
+        
+        return {
+            "message": message,
+            "analysis": analysis,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"NLP debug error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to debug NLP: {str(e)}"
         )
 
 @app.post("/ai/recommend")

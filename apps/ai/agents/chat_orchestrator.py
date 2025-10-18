@@ -59,9 +59,10 @@ CHAT_ORCHESTRATOR_SYSTEM_PROMPT = """You are an intelligent trading assistant or
 - PORTFOLIO: Keywords like "my portfolio", "my positions", "my holdings", "show my"
 
 **Symbol Extraction:**
-- Look for stock tickers (1-5 uppercase letters)
+- Look for stock tickers (1-5 letters, case-insensitive: aapl = AAPL, tsla = TSLA)
 - Convert company names to symbols (Apple → AAPL, Tesla → TSLA, Microsoft → MSFT, Nvidia → NVDA, etc.)
 - Handle multiple symbols separated by commas, "and", "or"
+- Always return symbols in uppercase format
 
 **Strategy Extraction (for BACKTEST):**
 - Extract the full strategy description in natural language
@@ -87,6 +88,16 @@ User: "backtest mean reversion on AAPL"
   "topic": null,
   "confidence": 0.98,
   "reasoning": "Explicit backtest request with strategy and symbol"
+}
+
+User: "backtest mean reversion on aapl"
+{
+  "intent": "BACKTEST",
+  "symbols": ["AAPL"],
+  "strategy_description": "mean reversion",
+  "topic": null,
+  "confidence": 0.98,
+  "reasoning": "Explicit backtest request with strategy and symbol (case-insensitive)"
 }
 
 User: "apply RSI oversold strategy to Apple, Tesla, and Nvidia"
@@ -176,8 +187,11 @@ class ChatOrchestratorAgent:
             symbols = analysis.get('symbols', [])
             strategy_desc = analysis.get('strategy_description')
             topic = analysis.get('topic')
+            confidence = analysis.get('confidence', 0)
+            reasoning = analysis.get('reasoning', 'No reasoning provided')
             
-            logger.info(f"Intent: {intent}, Symbols: {symbols}, Strategy: {strategy_desc}")
+            logger.info(f"Message Analysis - Intent: {intent}, Symbols: {symbols}, Strategy: {strategy_desc}, Confidence: {confidence}")
+            logger.info(f"Reasoning: {reasoning}")
             
             # Step 2: Route to appropriate handler
             if intent == "BACKTEST":
@@ -281,17 +295,43 @@ class ChatOrchestratorAgent:
         else:
             intent = "GENERAL"
         
-        # Extract symbols (simple regex)
+        # Extract symbols (case-insensitive regex and normalize to uppercase)
         import re
-        symbols = re.findall(r'\b[A-Z]{1,5}\b', message)
+        symbols = re.findall(r'\b[A-Za-z]{1,5}\b', message)
+        symbols = [s.upper() for s in symbols if s.upper() in [
+            # Common stock symbols
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'ADBE', 'CRM',
+            'AMD', 'INTC', 'ORCL', 'CSCO', 'IBM', 'UBER', 'LYFT', 'SNAP', 'TWTR', 'SQ',
+            'PYPL', 'V', 'MA', 'JPM', 'BAC', 'WFC', 'GS', 'MS', 'C', 'XOM', 'CVX', 'KO',
+            'PEP', 'WMT', 'HD', 'PG', 'JNJ', 'UNH', 'VZ', 'T', 'DIS', 'NKE', 'MCD', 'BA',
+            # Add more as needed
+        ]]
+        
+        # Extract strategy description for backtest
+        strategy_description = None
+        if intent == "BACKTEST":
+            strategy_keywords = ["mean reversion", "rsi", "moving average", "momentum", "trend", "support", "resistance"]
+            for keyword in strategy_keywords:
+                if keyword in message_lower:
+                    strategy_description = keyword
+                    break
+            if not strategy_description:
+                # Try to extract the strategy from context
+                words = message_lower.split()
+                if "mean" in words and "reversion" in words:
+                    strategy_description = "mean reversion"
+                elif "rsi" in words:
+                    strategy_description = "RSI strategy"
+                elif "moving" in words and "average" in words:
+                    strategy_description = "moving average strategy"
         
         return {
             'intent': intent,
             'symbols': symbols,
-            'strategy_description': None,
+            'strategy_description': strategy_description,
             'topic': None,
-            'confidence': 0.5,
-            'reasoning': 'Fallback analysis'
+            'confidence': 0.6,  # Higher confidence since we're being more specific
+            'reasoning': 'Fallback analysis with improved symbol and strategy extraction'
         }
     
     async def _handle_backtest(
