@@ -91,6 +91,23 @@ Entry/Exit rules must specify:
   "risk_management": {"stop_loss_percent": 0.04, "take_profit_percent": 0.12}
 }
 
+5. "mean reversion"
+{
+  "name": "Mean Reversion",
+  "description": "Buy when price is below 20-day SMA and RSI is oversold, sell when price returns to SMA",
+  "category": "Mean Reversion",
+  "indicators": [{"type": "sma", "period": 20}, {"type": "rsi", "period": 14}],
+  "entry_rules": [
+    {"indicator": "price", "condition": "<", "value": "sma_20"},
+    {"indicator": "rsi", "condition": "<", "value": 30}
+  ],
+  "exit_rules": [
+    {"indicator": "price", "condition": ">", "value": "sma_20"}
+  ],
+  "position_sizing": {"type": "fixed_percent", "value": 0.10},
+  "risk_management": {"stop_loss_percent": 0.05, "take_profit_percent": 0.10}
+}
+
 **Important Rules:**
 1. Always include reasonable exit rules (opposite of entry or standard profit targets)
 2. Use 10% position sizing as default
