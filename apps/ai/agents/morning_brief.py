@@ -200,47 +200,64 @@ class MorningBriefAgent:
         
         Target: <400 words, ~2 minute read
         """
-        # Build watchlist summary
+        # Build watchlist summary with better formatting
         watchlist_items = []
         for item in watchlist_analysis:
-            direction_emoji = "↑" if item['direction'] == 'bullish' else "↓" if item['direction'] == 'bearish' else "→"
-            trending_note = " (TRENDING)" if item['trending'] else ""
+            if item['direction'] == 'bullish':
+                emoji = "📈"
+                direction = "Bullish"
+            elif item['direction'] == 'bearish':
+                emoji = "📉"
+                direction = "Bearish"
+            else:
+                emoji = "➡️"
+                direction = "Neutral"
+            
+            trending = " 🔥 TRENDING" if item['trending'] else ""
             watchlist_items.append(
-                f"- {item['symbol']}: {item['sentiment_score']:.2f} {direction_emoji}{trending_note}"
+                f"{emoji} {item['symbol']}: Sentiment {item['sentiment_score']:.2f} ({direction}){trending}"
             )
         
-        # Create prompt for GPT
-        prompt = f"""Generate a concise morning market brief (MAX 350 words, ~2 minute read).
+        # Create prompt for GPT with structured format
+        prompt = f"""Generate a structured morning market brief (MAX 350 words).
 
-Greeting: {greeting}
-Market: {market}
-Market Context: {market_context}
+{greeting}
 
-Watchlist Sentiment:
+MARKET OVERVIEW:
+{market_context}
+
+WATCHLIST ANALYSIS:
 {chr(10).join(watchlist_items)}
 
-Top Bullish: {', '.join(s['symbol'] for s in top_bullish[:3])}
-Top Bearish: {', '.join(s['symbol'] for s in top_bearish[:3])}
+Top Bullish Opportunities: {', '.join(s['symbol'] for s in top_bullish[:3])}
+Top Bearish Signals: {', '.join(s['symbol'] for s in top_bearish[:3])}
 
-Create a brief that:
-1. Starts with the greeting
-2. Mentions market overview context briefly
-3. Highlights watchlist analysis (1 line per symbol with insight)
-4. Points out top bullish and bearish from watchlist
-5. Ends with 1-2 sentence key insight or market thesis
-6. Is concise, professional, and under 350 words
-7. Uses natural language suitable for voice narration
+Create a well-formatted brief with clear sections:
 
-Format for voice narration - avoid special characters, use natural speech."""
+1. Start with the greeting and market overview (2-3 sentences)
+2. WATCHLIST ANALYSIS section with insights for each symbol
+3. KEY INSIGHTS section highlighting:
+   - Top bullish opportunities and why
+   - Top bearish concerns and why  
+   - Overall market outlook for today
+4. End with a brief market thesis (1-2 sentences)
+
+FORMATTING RULES:
+- Use section headers: MARKET OVERVIEW, WATCHLIST ANALYSIS, KEY INSIGHTS
+- Use bullet points (•) for lists
+- Keep language natural and conversational for voice narration
+- Avoid complex punctuation or special characters
+- Maximum 350 words total
+- Make it sound like a professional trader briefing their team"""
 
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a professional market analyst creating concise morning briefs. Be clear, concise, and insightful. Maximum 350 words."},
+                    {"role": "system", "content": "You are Kopi Colt, a professional market analyst with a friendly, down-to-earth style. Create structured morning briefs that are clear, insightful, and easy to read or listen to. Use section headers, bullet points, and natural language. Maximum 350 words."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=500,
+                max_tokens=600,
                 temperature=0.7
             )
             

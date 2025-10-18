@@ -1,0 +1,21 @@
+# Core FastAPI - Python 3.13 compatible
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+aiofiles==23.2.1
+
+# AI APIs
+openai==1.90.0
+anthropic==0.40.0
+groq==0.11.0
+
+# HTTP/Requests
+httpx==0.24.1
+requests==2.31.0
+
+# Market Data (skip pandas/numpy for now)
+yfinance==0.2.36
+

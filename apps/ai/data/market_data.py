@@ -54,10 +54,12 @@ class MarketDataService:
         try:
             if self.provider == "yfinance":
                 ticker = yf.Ticker(symbol)
-                data = ticker.history(period="1d")
+                # Use 5d period to get data even when markets are closed
+                data = ticker.history(period="5d")
                 if data.empty:
                     logger.warning(f"No data for {symbol}")
                     return None
+                # Get the most recent closing price
                 return float(data['Close'].iloc[-1])
             
             elif self.provider == "alphavantage":

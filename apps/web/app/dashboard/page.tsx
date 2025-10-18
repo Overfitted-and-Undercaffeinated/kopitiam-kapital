@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import BriefOverlay from '@/components/BriefOverlay'
+import WelcomeSequence from '@/components/WelcomeSequence'
+import { useUser } from '@/hooks/useUser'
 
 // Dynamically import the cowboy scene
 const CowboyScene = dynamic(
@@ -37,6 +39,51 @@ export default function DashboardPage() {
   const [todayEODBrief, setTodayEODBrief] = useState<Brief | null>(null)
   const [historicalBriefs, setHistoricalBriefs] = useState<Brief[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [rawMorningData, setRawMorningData] = useState<any>(null)
+  const [rawEODData, setRawEODData] = useState<any>(null)
+  const [recommendations, setRecommendations] = useState<any[]>([])
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
+  
+  // Welcome sequence state
+  const [showWelcomeSequence, setShowWelcomeSequence] = useState(true)
+  const [welcomeComplete, setWelcomeComplete] = useState(false)
+  
+  // Use the useUser hook to get authenticated user data
+  const { user, loading: userLoading, error: userError } = useUser()
+  
+  // Debug logging for user data
+  useEffect(() => {
+    console.log('🔍 User hook state:', { user, userLoading, userError })
+    if (user) {
+      console.log('✅ User data loaded:', { name: user.name, email: user.email })
+    }
+  }, [user, userLoading, userError])
+
+  // Check if user is not authenticated and redirect to login
+  useEffect(() => {
+    if (!userLoading && !user && (userError?.includes('User profile not found') || !userError)) {
+      console.log('🚨 No user found, redirecting to login...')
+      window.location.href = '/login?redirectTo=/dashboard'
+    }
+  }, [user, userLoading, userError])
+
+  // Fallback: If useUser hook is taking too long, try direct API call
+  useEffect(() => {
+    if (userLoading && !user) {
+      console.log('⏰ useUser hook taking too long, trying direct API call...')
+      const timeoutId = setTimeout(async () => {
+        try {
+          const response = await fetch('/api/user')
+          const data = await response.json()
+          console.log('🔍 Direct API call result:', data)
+        } catch (error) {
+          console.error('❌ Direct API call failed:', error)
+        }
+      }, 2000) // Try after 2 seconds
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [userLoading, user])
 
   // Track cursor position
   useEffect(() => {
@@ -47,107 +94,178 @@ export default function DashboardPage() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
 
-  // Fetch briefs on mount - ALWAYS USE DUMMY DATA FOR DEMO
+  // Start data fetching immediately on mount (user data handled by useUser hook)
   useEffect(() => {
-    // Always load dummy data immediately for demo
-    setTimeout(() => {
-      setDummyData()
-      setIsLoading(false)
-    }, 800)
-  }, [])
-
-  const setDummyData = () => {
-    const today = new Date().toISOString().split('T')[0]
+    const userId = localStorage.getItem('userId') || 'demo_user'
     
-    const dummyMorning: Brief = {
-      id: '1',
-      type: 'morning',
-      date: today,
-      content: {
-        summary: "Well howdy there, partner! Kopi Colt here with your morning round-up. Saddle up 'cause today's lookin' mighty profitable! The markets are ridin' high like a tumbleweed in a dust storm, and I've wrangled up some golden opportunities for ya. Banks are gallopin' ahead, and there's treasure to be found if you know where to dig!",
-        market_overview: "Rise and shine, buckaroo! The STI's opened up 0.3% higher at 3,245 points - that's what I call a strong start to the day! Wall Street gave us a mighty fine boost overnight, and our banking cowboys are leading the charge with DBS up 1.2% in pre-market. Hong Kong's takin' it easy today, but Japan's ridin' up 0.5%. It's a mixed bag across the frontier, but opportunity's knockin'!",
-        key_points: [
-          "Hot diggity! DBS just announced earnings that knocked it clean outta the park - beat expectations by 8%! That's what I call shootin' straight!",
-          "Singapore's GDP got revised upward to 3.2% - economy's stronger than a bull at a rodeo, partner!",
-          "Tech sector's takin' some heat from them US chip restrictions - might see some good entry points for the brave!",
-          "REITs are catchin' wind with stable interest rates - steady as a trusty steed!",
-          "Keep your eyes peeled for the Fed Chair speech at 10PM SGT - could shake things up come tomorrow!"
-        ],
-        recommendations: [
-          "DBS Group Holdings (D05) - This stallion's ready to run! Strong buy on that earnings beat. Hop on at $35.20, ridin' to $37.50!",
-          "CapitaLand Investment (9CI) - Time to accumulate, partner. REIT strength lookin' solid. Entry: $3.15, Target: $3.45",
-          "Venture Corp (V03) - Keep this one in your sights. Oversold bounce comin'. Entry: $15.80, Stop-loss: $15.20 - don't let it buck ya off!"
-        ]
-      }
-    }
-
-    const dummyEOD: Brief = {
-      id: '2',
-      type: 'eod',
-      date: today,
-      content: {
-        summary: "Well partner, we can hang up our spurs for today - and what a ride it was! Kopi Colt here reportin' from the end of the trail. Your portfolio rode like a champion today, with solid gains across the board. The banks delivered just like I told ya this mornin', and we dodged them tech tumbleweeds real nice!",
-        market_overview: "The dust has settled and the STI closed up 0.45% at 3,259 points - not bad for a day's work! Banking stocks were the real heroes, leadin' the stampede. We saw some mighty fine volume at 1.2B shares traded - that's a busy waterin' hole! Hong Kong dipped 0.3% but Japan finished strong at +0.8%. Mixed results across the frontier, but we came out on top!",
-        key_points: [
-          "Hot damn! Your DBS position galloped up 1.5% today - that's $450 straight into your saddlebag!",
-          "Tech stocks got a little dusty as expected, but we held our ground at them support levels - no stampede here!",
-          "Banking sector's still got momentum - looks like tomorrow's gonna be another good day for a ride!",
-          "Keep your eyes open for some profit-takin' in early trading tomorrow - some cowboys might cash in their chips",
-          "Your risk exposure is lookin' mighty conservative - just the way I like it, partner!"
-        ],
-        portfolio_summary: {
-          total_value: "$52,450",
-          daily_pnl: "+$685 (+1.3%)",
-          positions: 5
-        }
-      }
-    }
-
-    const historical: Brief[] = [
-      {
-        id: '3',
-        type: 'morning',
-        date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-        content: {
-          summary: "Yesterday's morning brief...",
-          market_overview: "Markets opened cautiously...",
-          key_points: ["Point 1", "Point 2"],
-          recommendations: ["Rec 1"]
-        }
-      },
-      {
-        id: '4',
-        type: 'eod',
-        date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-        content: {
-          summary: "Yesterday's EOD report...",
-          market_overview: "Markets closed mixed...",
-          key_points: ["Point 1", "Point 2"],
-          portfolio_summary: {
-            total_value: "$51,765",
-            daily_pnl: "-$235 (-0.45%)",
-            positions: 5
+    // Try to fetch real briefs from AI backend
+    fetchRealBriefs(userId)
+    
+    // Fetch recommendations for watchlist
+    fetchRecommendations(userId, ['NVDA', 'AAPL', 'DBS'])
+  }, [])
+  
+  const fetchRealBriefs = async (userId: string) => {
+    setIsLoading(true)
+    
+    try {
+      const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+      const watchlist = ['NVDA', 'AAPL', 'DBS'] // Default watchlist
+      
+      console.log('=== FETCHING MORNING BRIEF FROM PYTHON API ===')
+      console.log('API URL:', AI_API_URL)
+      console.log('Request payload:', { watchlist, market: 'US', user_id: userId, include_voice: false })
+      
+      // Fetch raw morning brief directly from Python backend
+      const morningResponse = await fetch(`${AI_API_URL}/briefs/morning`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          watchlist,
+          market: 'US',
+          user_id: userId,
+          include_voice: true
+        }),
+        signal: AbortSignal.timeout(60000) // 60 second timeout
+      })
+      
+      console.log('Morning brief response status:', morningResponse.status)
+      
+      if (morningResponse.ok) {
+        const morningData = await morningResponse.json()
+        console.log('✅ MORNING BRIEF RECEIVED FROM PYTHON API:')
+        console.log('Full response:', morningData)
+        setRawMorningData(morningData)
+        
+        // Create a simple brief object for fallback
+        setTodayMorningBrief({
+          id: '1',
+          type: 'morning',
+          date: new Date().toISOString(),
+          content: {
+            summary: morningData.text || 'No summary available',
+            market_overview: morningData.text || 'No overview available',
+            key_points: []
           }
-        }
+        })
+      } else {
+        const errorText = await morningResponse.text()
+        console.error('❌ Failed to fetch morning brief from backend')
+        console.error('Status:', morningResponse.status)
+        console.error('Error response:', errorText)
       }
-    ]
-
-    setTodayMorningBrief(dummyMorning)
-    setTodayEODBrief(dummyEOD)
-    setHistoricalBriefs(historical)
+      
+      console.log('=== FETCHING EOD BRIEF FROM PYTHON API ===')
+      
+      // Fetch raw EOD brief directly from Python backend
+      const eodResponse = await fetch(`${AI_API_URL}/briefs/eod`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          watchlist,
+          market: 'US',
+          user_id: userId,
+          include_voice: true
+        }),
+        signal: AbortSignal.timeout(60000) // 60 second timeout
+      })
+      
+      console.log('EOD brief response status:', eodResponse.status)
+      
+      if (eodResponse.ok) {
+        const eodData = await eodResponse.json()
+        console.log('✅ EOD BRIEF RECEIVED FROM PYTHON API:')
+        console.log('Full response:', eodData)
+        setRawEODData(eodData)
+        
+        // Create a simple brief object for fallback
+        setTodayEODBrief({
+          id: '2',
+          type: 'eod',
+          date: new Date().toISOString(),
+          content: {
+            summary: eodData.text || 'No summary available',
+            market_overview: eodData.text || 'No overview available',
+            key_points: []
+          }
+        })
+      } else {
+        const errorText = await eodResponse.text()
+        console.error('❌ Failed to fetch EOD brief from backend')
+        console.error('Status:', eodResponse.status)
+        console.error('Error response:', errorText)
+      }
+      
+      // If both failed, log it clearly but don't use dummy data
+      if (!morningResponse.ok && !eodResponse.ok) {
+        console.error('❌ BOTH BRIEFS FAILED - NO DATA AVAILABLE')
+        console.error('Check that Python backend is running at:', AI_API_URL)
+      }
+      
+    } catch (error) {
+      console.error('❌ EXCEPTION WHILE FETCHING BRIEFS:', error)
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      })
+    } finally {
+      setIsLoading(false)
+      console.log('=== BRIEF FETCHING COMPLETE ===')
+    }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="w-12 h-12 border-4 border-[#8B7355] border-t-transparent rounded-full"
-        />
-      </div>
-    )
+  const fetchRecommendations = async (userId: string, symbols: string[]) => {
+    setLoadingRecommendations(true)
+    const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+    
+    try {
+      console.log('=== FETCHING RECOMMENDATIONS ===')
+      console.log('Symbols:', symbols)
+      
+      // Fetch recommendations for each symbol in parallel
+      const recommendationPromises = symbols.map(async (symbol) => {
+        try {
+          const response = await fetch(`${AI_API_URL}/ai/recommend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              symbol,
+              user_id: userId,
+              include_sentiment: true,
+              include_backtest: true
+            }),
+            signal: AbortSignal.timeout(30000) // 30 second timeout per symbol
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`✅ Recommendation for ${symbol}:`, data)
+            return { symbol, ...data, success: true }
+          } else {
+            console.error(`❌ Failed to fetch recommendation for ${symbol}:`, response.status)
+            return { symbol, success: false }
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching recommendation for ${symbol}:`, error)
+          return { symbol, success: false }
+        }
+      })
+      
+      const results = await Promise.all(recommendationPromises)
+      const successfulRecommendations = results.filter(r => r.success)
+      
+      console.log(`✅ Fetched ${successfulRecommendations.length}/${symbols.length} recommendations`)
+      setRecommendations(successfulRecommendations)
+      
+    } catch (error) {
+      console.error('❌ Error fetching recommendations:', error)
+    } finally {
+      setLoadingRecommendations(false)
+      console.log('=== RECOMMENDATION FETCHING COMPLETE ===')
+    }
   }
+
 
   return (
     <div className="min-h-screen bg-[#FAFAF9] relative" style={{ fontFamily: 'var(--font-body)' }}>
@@ -192,6 +310,29 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {/* Quick Access Navigation */}
+      <div className="bg-white border-b border-[#E5E5E5]">
+        <div className="container mx-auto px-6">
+          <div className="flex gap-1 overflow-x-auto py-2">
+            <a href="/sentiment" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📊 Sentiment
+            </a>
+            <a href="/backtest" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📈 Backtest
+            </a>
+            <a href="/alerts" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              🔔 Alerts
+            </a>
+            <a href="/analysis" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📄 Analysis
+            </a>
+            <a href="/portfolio" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              💼 Portfolio
+            </a>
+          </div>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="sticky top-[73px] z-30 bg-white border-b border-[#E5E5E5]">
@@ -246,6 +387,61 @@ export default function DashboardPage() {
               exit={{ opacity: 0 }}
               className="space-y-6"
             >
+              {/* Market Sentiment Summary (if available from briefs) */}
+              {rawMorningData?.sentiment_summary && (
+                <motion.section 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-br from-[#8B7355] to-[#6F5D47] rounded-lg p-6 border border-[#6F5D47] text-white"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      📊 Market Sentiment
+                    </h2>
+                    <div className="text-sm opacity-90">
+                      {rawMorningData.symbols_analyzed?.length || 0} symbols analyzed
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Average Sentiment</div>
+                      <div className="text-3xl font-bold">
+                        {(rawMorningData.sentiment_summary.average_sentiment * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">
+                        {rawMorningData.sentiment_summary.average_sentiment >= 0.55 ? '🟢 Bullish' :
+                         rawMorningData.sentiment_summary.average_sentiment <= 0.45 ? '🔴 Bearish' :
+                         '🟡 Neutral'}
+                      </div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Bullish</div>
+                      <div className="text-3xl font-bold text-green-300">
+                        {rawMorningData.sentiment_summary.bullish_count || 0}
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">stocks</div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Bearish</div>
+                      <div className="text-3xl font-bold text-red-300">
+                        {rawMorningData.sentiment_summary.bearish_count || 0}
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">stocks</div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Trending</div>
+                      <div className="text-3xl font-bold text-blue-300">
+                        {rawMorningData.sentiment_summary.trending_count || 0}
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">mentions</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs opacity-75">
+                    Sources: Exa.ai News, Reddit, StockTwits • Updated: {new Date(rawMorningData.generated_at).toLocaleTimeString()}
+                  </div>
+                </motion.section>
+              )}
+
               {/* Portfolio Overview */}
               <section className="bg-white rounded-lg p-6 border border-[#E5E5E5]">
                 <div className="flex items-center justify-between mb-6">
@@ -329,64 +525,109 @@ export default function DashboardPage() {
 
               {/* Trading Ideas */}
               <section className="bg-white rounded-lg p-6 border border-[#E5E5E5]">
-                <h2 className="text-xl font-bold text-[#2F1810] mb-6">
-                  Today's Opportunities
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    {
-                      symbol: 'V03',
-                      name: 'Venture Corp',
-                      action: 'BUY',
-                      entry: 15.8,
-                      target: 16.5,
-                      reason: 'Oversold bounce opportunity on strong support',
-                    },
-                    {
-                      symbol: 'S68',
-                      name: 'SGX',
-                      action: 'WATCH',
-                      entry: 9.2,
-                      target: 9.6,
-                      reason: 'Breaking above resistance, volume confirming',
-                    },
-                  ].map((idea, idx) => (
-                    <motion.div
-                      key={idea.symbol}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="p-5 bg-[#FAFAF9] rounded-lg border border-[#E5E5E5] hover:border-[#8B7355] transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <div className="text-lg font-bold text-[#2F1810]">{idea.symbol}</div>
-                          <div className="text-sm text-[#6B5D52]">{idea.name}</div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-[#2F1810]">
+                    AI Recommendations
+                  </h2>
+                  {loadingRecommendations && (
+                    <div className="text-sm text-[#6B5D52] flex items-center gap-2">
+                      <motion.div
+                        className="w-2 h-2 bg-[#8B7355] rounded-full"
+                        animate={{ scale: [1, 1.5, 1] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                      />
+                      Analyzing...
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {recommendations.length > 0 ? (
+                    recommendations.map((rec, idx) => (
+                      <motion.div
+                        key={rec.symbol}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="p-5 bg-[#FAFAF9] rounded-lg border border-[#E5E5E5] hover:border-[#8B7355] transition-colors"
+                      >
+                        {/* Header with symbol and action */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <div className="text-lg font-bold text-[#2F1810]">{rec.symbol}</div>
+                            {rec.sentiment_score !== undefined && (
+                              <div className="text-xs mt-1">
+                                {rec.sentiment_score >= 0.55 ? (
+                                  <span className="text-green-600">🟢 Bullish {(rec.sentiment_score * 100).toFixed(0)}%</span>
+                                ) : rec.sentiment_score <= 0.45 ? (
+                                  <span className="text-red-600">🔴 Bearish {(rec.sentiment_score * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-yellow-600">🟡 Neutral {(rec.sentiment_score * 100).toFixed(0)}%</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            className={`px-3 py-1 rounded-md text-xs font-semibold ${
+                              rec.action === 'BUY' || rec.recommendation === 'BUY'
+                                ? 'bg-green-100 text-green-700'
+                                : rec.action === 'SELL' || rec.recommendation === 'SELL'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}
+                          >
+                            {rec.action || rec.recommendation || 'ANALYZE'}
+                          </div>
                         </div>
-                        <div
-                          className={`px-3 py-1 rounded-md text-xs font-semibold ${
-                            idea.action === 'BUY'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {idea.action}
-                        </div>
-                      </div>
-                      <p className="text-[#4A3F35] text-sm mb-4">{idea.reason}</p>
-                      <div className="flex items-center justify-between text-sm">
-                        <div>
-                          <div className="text-[#6B5D52]">Entry</div>
-                          <div className="font-semibold text-[#2F1810]">${idea.entry}</div>
-                        </div>
-                        <div className="text-[#9CA3AF]">→</div>
-                        <div>
-                          <div className="text-[#6B5D52]">Target</div>
-                          <div className="font-semibold text-[#2F1810]">${idea.target}</div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+
+                        {/* Reasoning */}
+                        <p className="text-[#4A3F35] text-sm mb-3 line-clamp-2">
+                          {rec.reasoning || rec.rationale || 'AI-powered analysis based on sentiment and backtesting'}
+                        </p>
+
+                        {/* Backtest metrics if available */}
+                        {rec.backtest_metrics && (
+                          <div className="mb-3 p-2 bg-white rounded border border-[#E5E5E5]">
+                            <div className="text-xs text-[#6B5D52] mb-1">Backtest Results</div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span>Win Rate: {(rec.backtest_metrics.win_rate * 100).toFixed(0)}%</span>
+                              <span>Return: {rec.backtest_metrics.total_return?.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Price targets */}
+                        {(rec.entry_price || rec.target_price) && (
+                          <div className="flex items-center justify-between text-sm pt-3 border-t border-[#E5E5E5]">
+                            {rec.entry_price && (
+                              <div>
+                                <div className="text-[#6B5D52] text-xs">Entry</div>
+                                <div className="font-semibold text-[#2F1810]">${rec.entry_price.toFixed(2)}</div>
+                              </div>
+                            )}
+                            <div className="text-[#9CA3AF]">→</div>
+                            {rec.target_price && (
+                              <div>
+                                <div className="text-[#6B5D52] text-xs">Target</div>
+                                <div className="font-semibold text-[#2F1810]">${rec.target_price.toFixed(2)}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Disclaimer */}
+                        {rec.disclaimer && (
+                          <div className="mt-3 pt-3 border-t border-[#E5E5E5]">
+                            <p className="text-xs text-[#9CA3AF] italic">{rec.disclaimer}</p>
+                          </div>
+                        )}
+                      </motion.div>
+                    ))
+                  ) : !loadingRecommendations ? (
+                    <div className="col-span-full text-center py-8 text-[#6B5D52]">
+                      <p className="mb-2">No recommendations available yet.</p>
+                      <p className="text-sm">Make sure the AI backend is running!</p>
+                    </div>
+                  ) : null}
                 </div>
               </section>
             </motion.div>
@@ -460,29 +701,64 @@ export default function DashboardPage() {
         </AnimatePresence>
       </div>
 
-      {/* Brief Overlays - ALWAYS RENDER FOR DEMO */}
-      <BriefOverlay
-        isOpen={showMorningBrief && !isLoading}
-        onClose={() => setShowMorningBrief(false)}
-        type="morning"
-        brief={{
-          date: todayMorningBrief?.date || new Date().toISOString().split('T')[0],
-          summary: todayMorningBrief?.content.summary || "Loading your morning brief...",
-          market_overview: todayMorningBrief?.content.market_overview || "Markets are opening...",
-          key_points: todayMorningBrief?.content.key_points || ["Loading..."],
-          recommendations: todayMorningBrief?.content.recommendations || []
-        }}
-      />
-      {todayEODBrief && (
-        <BriefOverlay
-          isOpen={showEODBrief}
-          onClose={() => setShowEODBrief(false)}
-          type="eod"
-          brief={{
-            date: todayEODBrief.date,
-            ...todayEODBrief.content,
+      {/* Welcome Sequence - Shows while loading */}
+      {showWelcomeSequence && !welcomeComplete && (
+        <WelcomeSequence
+          userName={user?.name || 'Partner'}
+          isDataLoaded={!isLoading && rawMorningData !== null}
+          onComplete={() => {
+            setWelcomeComplete(true)
+            setShowWelcomeSequence(false)
           }}
         />
+      )}
+      
+      {/* Debug info - remove this later */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-4 left-4 bg-black text-white p-2 text-xs z-[999]">
+          <div>User Loading: {userLoading ? 'Yes' : 'No'}</div>
+          <div>User: {user ? user.name : 'None'}</div>
+          <div>Error: {userError || 'None'}</div>
+          <div className="mt-2">
+            <button 
+              onClick={() => window.location.href = '/login?redirectTo=/dashboard'}
+              className="bg-red-600 px-2 py-1 rounded text-xs"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Brief Overlays - Only show after welcome sequence */}
+      {welcomeComplete && (
+        <>
+          <BriefOverlay
+            isOpen={showMorningBrief && !isLoading}
+            onClose={() => setShowMorningBrief(false)}
+            type="morning"
+            brief={{
+              date: todayMorningBrief?.date || new Date().toISOString().split('T')[0],
+              summary: todayMorningBrief?.content.summary || "Loading your morning brief...",
+              market_overview: todayMorningBrief?.content.market_overview || "Markets are opening...",
+              key_points: todayMorningBrief?.content.key_points || ["Loading..."],
+              recommendations: todayMorningBrief?.content.recommendations || []
+            }}
+            rawBackendData={rawMorningData}
+          />
+          {todayEODBrief && (
+            <BriefOverlay
+              isOpen={showEODBrief}
+              onClose={() => setShowEODBrief(false)}
+              type="eod"
+              brief={{
+                date: todayEODBrief.date,
+                ...todayEODBrief.content,
+              }}
+              rawBackendData={rawEODData}
+            />
+          )}
+        </>
       )}
     </div>
   )

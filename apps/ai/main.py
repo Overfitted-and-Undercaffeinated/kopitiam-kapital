@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import models and agents
-from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse
+from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse, OrchestrateRequest
 from agents.router import RouterAgent
 
 # Lifespan handler for startup/shutdown
@@ -114,13 +114,18 @@ async def rate_limit_middleware(request: Request, call_next):
         # Try to get from JSON body for POST requests
         if request.method == "POST":
             try:
-                body = await request.body()
-                if body:
+                body_bytes = await request.body()
+                if body_bytes:
                     import json
-                    data = json.loads(body)
+                    data = json.loads(body_bytes)
                     user_id = data.get('user_id')
-                    # Re-populate body for downstream handlers
-                    request._body = body
+                    
+                    # CRITICAL FIX: Properly restore body for downstream handlers
+                    # FastAPI needs the receive callable to return the body
+                    async def receive():
+                        return {"type": "http.request", "body": body_bytes}
+                    
+                    request._receive = receive
             except:
                 pass
     
@@ -261,11 +266,7 @@ async def route_query(request: RouterRequest):
         )
 
 @app.post("/ai/orchestrate")
-async def orchestrate_request(
-    query: str,
-    user_id: str,
-    context: Dict = None
-):
+async def orchestrate_request(request: OrchestrateRequest):
     """
     Orchestrate complete AI workflow
     
@@ -283,9 +284,7 @@ async def orchestrate_request(
     - "Show my portfolio" → PORTFOLIO → Positions + P&L
     
     Args:
-        query: Natural language query
-        user_id: User ID
-        context: Optional context dict
+        request: OrchestrateRequest with query, user_id, and optional context
     
     Returns:
         {
@@ -297,9 +296,9 @@ async def orchestrate_request(
         from agents.orchestrator import orchestrator_agent
         
         result = await orchestrator_agent.handle_request(
-            query=query,
-            user_id=user_id,
-            context=context
+            query=request.query,
+            user_id=request.user_id,
+            context=request.context
         )
         
         return result
@@ -1006,6 +1005,54 @@ async def get_sentiment(symbol: str, user_id: str = None):
 # BRIEF ENDPOINTS
 # ============================================================================
 
+@app.post("/briefs/morning/test")
+async def test_morning_brief(request: BriefRequest):
+    """Simple test endpoint for morning brief debugging"""
+    try:
+        logger.info(f"TEST: Starting morning brief generation for user {request.user_id}")
+        
+        # Return a simple test response
+        from datetime import datetime
+        return {
+            "type": "morning",
+            "text": f"Test morning brief for {request.user_id} with watchlist {request.watchlist}",
+            "audio_base64": None,
+            "symbols_analyzed": request.watchlist,
+            "sentiment_summary": {"test": True},
+            "generated_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"TEST: Error in test endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/briefs/morning/debug")
+async def debug_morning_brief(request: BriefRequest):
+    """Debug endpoint to trace where the hang occurs"""
+    try:
+        logger.info("DEBUG: Step 1 - Request received")
+        
+        logger.info("DEBUG: Step 2 - About to import morning_brief_agent")
+        from agents.morning_brief import morning_brief_agent
+        logger.info("DEBUG: Step 3 - morning_brief_agent imported successfully")
+        
+        logger.info("DEBUG: Step 4 - About to call generate_brief")
+        brief = await morning_brief_agent.generate_brief(
+            watchlist=request.watchlist,
+            market=request.market,
+            user_id=request.user_id,
+            include_voice=request.include_voice
+        )
+        logger.info("DEBUG: Step 5 - generate_brief completed successfully")
+        
+        return brief
+        
+    except Exception as e:
+        logger.error(f"DEBUG: Error occurred: {e}")
+        import traceback
+        logger.error(f"DEBUG: Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/briefs/morning", response_model=BriefResponse)
 async def generate_morning_brief(request: BriefRequest):
     """
@@ -1037,6 +1084,9 @@ async def generate_morning_brief(request: BriefRequest):
         }
     """
     try:
+        logger.info(f"Starting morning brief generation for user {request.user_id}")
+        logger.info(f"Request: watchlist={request.watchlist}, market={request.market}, include_voice={request.include_voice}")
+        
         from agents.morning_brief import morning_brief_agent
         
         brief = await morning_brief_agent.generate_brief(
@@ -1046,10 +1096,13 @@ async def generate_morning_brief(request: BriefRequest):
             include_voice=request.include_voice
         )
         
+        logger.info(f"Morning brief generated successfully: {brief.get('type', 'unknown')}")
         return brief
     
     except Exception as e:
         logger.error(f"Error generating morning brief: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate morning brief: {str(e)}"
