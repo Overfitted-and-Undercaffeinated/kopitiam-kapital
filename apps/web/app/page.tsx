@@ -1429,7 +1429,7 @@ export default function Home() {
                 Join Kopitiam Capital and start making informed trading decisions
               </p>
               <motion.a
-                href="/dashboard"
+                href="/onboarding"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="inline-block bg-[#FFF8DC] text-[#2F1810] px-16 py-8 rounded-2xl text-3xl font-bold transition-all"
