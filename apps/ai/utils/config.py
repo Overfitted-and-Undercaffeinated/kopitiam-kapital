@@ -1,6 +1,8 @@
 """Configuration management"""
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
+from pathlib import Path
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -16,6 +18,7 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str
     supabase_service_key: str
+    supabase_anon_key: Optional[str] = None
     
     # Redis
     redis_url: str = "redis://localhost:6379"
@@ -25,10 +28,25 @@ class Settings(BaseSettings):
     
     # Environment
     python_env: str = "development"
+    node_env: str = "development"
     
     class Config:
-        env_file = ".env"
+        # Try to load from project root .env first
+        env_file = str(Path(__file__).parent.parent.parent.parent / ".env")
+        env_file_encoding = 'utf-8'
         case_sensitive = False
+        extra = "allow"  # Allow extra fields from .env
 
-settings = Settings()
+# Singleton instance
+_settings = None
+
+def get_settings() -> Settings:
+    """Get or create settings singleton"""
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
+
+# For backward compatibility
+settings = get_settings()
 
