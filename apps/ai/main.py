@@ -612,31 +612,71 @@ async def get_strategy_template(template_id: str):
 async def run_backtest(
     symbol: str,
     strategy_definition: Dict = None,
+    natural_language_strategy: str = None,
     strategy_template_id: str = None,
     start_date: str = None,
     end_date: str = None,
-    initial_capital: float = 100000
+    initial_capital: float = 100000,
+    include_visuals: bool = True,
+    include_voice: bool = True,  # Voice narration enabled by default
+    user_id: str = None
 ):
     """
-    Run a backtest with custom strategy or template
+    Enhanced backtest with natural language input, visual output, and AI explanation
     
-    **Latency target**: <5s for 1-year backtest
+    **Latency target**: 10-15s for complete analysis with voice (2-year backtest)
+    
+    **NEW FEATURES**:
+    - Natural language strategy input: "buy when RSI is below 30"
+    - Visual chart data (equity curve, drawdown series, monthly returns)
+    - AI-generated performance explanation
+    - Voice narration with ElevenLabs
+    - Advanced risk metrics (VaR, CVaR)
     
     Args:
         symbol: Stock ticker
         strategy_definition: Custom strategy JSON (optional)
+        natural_language_strategy: Strategy in plain English (NEW, optional)
         strategy_template_id: Use a pre-built template (optional)
-        start_date: Start date (YYYY-MM-DD, optional)
-        end_date: End date (YYYY-MM-DD, optional)
+        start_date: Start date (YYYY-MM-DD, optional, defaults to 2 years ago)
+        end_date: End date (YYYY-MM-DD, optional, defaults to today)
         initial_capital: Starting capital (default: $100,000)
+        include_visuals: Include chart data (default: True)
+        include_voice: Include voice narration (default: True)
+        user_id: User ID for cost tracking (optional)
     
     Returns:
         {
-            "metrics": {...},
-            "trades": [...],
-            "equity_curve": [...],
-            "summary": {...}
+            "symbol": "NVDA",
+            "strategy": {...},
+            "metrics": {
+                "win_rate": 0.67,
+                "sharpe_ratio": 1.85,
+                "total_return_pct": 0.23,
+                "var_95": -0.05,
+                "cvar_95": -0.07,
+                ...
+            },
+            "visuals": {
+                "equity_curve": [{date, equity}],
+                "drawdown_series": [{date, drawdown}],
+                "monthly_returns": {"2023-01": 0.05, ...},
+                "trade_distribution": {wins: 30, losses: 15}
+            },
+            "explanation": "This strategy works by...",
+            "voice_audio_base64": "...",
+            "period": "2023-01-01 to 2025-01-01"
         }
+    
+    Examples:
+        # Natural language
+        POST /backtest/run {"symbol": "AAPL", "natural_language_strategy": "buy when price is below the 2 week low"}
+        
+        # Template
+        POST /backtest/run {"symbol": "MSFT", "strategy_template_id": "rsi_oversold"}
+        
+        # Without voice (faster)
+        POST /backtest/run {"symbol": "TSLA", "natural_language_strategy": "buy on MACD crossover", "include_voice": false}
     """
     try:
         from backtesting.engine import BacktestEngine
@@ -645,46 +685,133 @@ async def run_backtest(
         from data.market_data import market_data_service
         from datetime import datetime, timedelta
         
-        logger.info(f"Running backtest for {symbol}")
+        logger.info(f"Running enhanced backtest for {symbol}")
         
-        # Get strategy
-        if strategy_template_id:
+        # STEP 1: Determine strategy source
+        if natural_language_strategy:
+            logger.info(f"Translating natural language strategy: '{natural_language_strategy}'")
+            from agents.strategy_translator import strategy_translator
+            
+            try:
+                strategy_def = await strategy_translator.translate_strategy(
+                    natural_language=natural_language_strategy,
+                    symbol=symbol
+                )
+                logger.info(f"Strategy translated to: {strategy_def['name']}")
+            except Exception as e:
+                logger.error(f"Strategy translation failed: {e}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not translate strategy: {str(e)}. Please rephrase or try a different description."
+                )
+        elif strategy_template_id:
             strategy_def = get_template(strategy_template_id)
             if not strategy_def:
-                raise HTTPException(status_code=404, detail=f"Template '{strategy_template_id}' not found")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Template '{strategy_template_id}' not found"
+                )
         elif strategy_definition:
             strategy_def = strategy_definition
         else:
-            raise HTTPException(status_code=400, detail="Must provide either strategy_definition or strategy_template_id")
+            raise HTTPException(
+                status_code=400,
+                detail="Must provide natural_language_strategy, strategy_definition, or strategy_template_id"
+            )
         
-        # Build strategy function
-        strategy_func = strategy_builder.build_strategy(strategy_def)
-        
-        # Set date defaults
+        # STEP 2: Set date range (default to 2 years)
         if not start_date:
-            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
         if not end_date:
             end_date = datetime.now().strftime('%Y-%m-%d')
         
-        # Run backtest
+        logger.info(f"Backtesting period: {start_date} to {end_date}")
+        
+        # STEP 3: Build and run strategy
+        strategy_func = strategy_builder.build_strategy(strategy_def)
         engine = BacktestEngine()
+        
         results = await engine.run_backtest(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,
             strategy_fn=strategy_func,
-            initial_capital=initial_capital
+            initial_capital=initial_capital,
+            include_visuals=include_visuals
         )
         
-        logger.info(f"Backtest complete for {symbol}: {results['total_return_pct']:.2%} return, {results['num_trades']} trades")
+        logger.info(
+            f"Backtest complete: {results['total_return_pct']:.2%} return, "
+            f"{results['num_trades']} trades, {results['win_rate']:.2%} win rate"
+        )
         
-        return {
+        # STEP 4: Calculate VaR and CVaR
+        from data.risk import calculate_var, calculate_cvar
+        
+        returns = [t['pnl_pct'] for t in results['trades'] if t.get('pnl_pct') is not None]
+        if returns:
+            results['var_95'] = calculate_var(returns, 0.95)
+            results['cvar_95'] = calculate_cvar(returns, 0.95)
+            logger.info(f"Risk metrics: VaR={results['var_95']:.2%}, CVaR={results['cvar_95']:.2%}")
+        else:
+            results['var_95'] = 0.0
+            results['cvar_95'] = 0.0
+        
+        # STEP 5: Generate AI explanation
+        from agents.backtest_explainer import backtest_explainer
+        
+        try:
+            explanation = await backtest_explainer.generate_explanation(
+                strategy_name=strategy_def['name'],
+                strategy_description=strategy_def.get('description', 'Custom trading strategy'),
+                metrics=results,
+                symbol=symbol,
+                period=f"{start_date} to {end_date}"
+            )
+            logger.info(f"Explanation generated: {len(explanation)} characters")
+        except Exception as e:
+            logger.error(f"Explanation generation failed: {e}")
+            explanation = f"Backtest completed for {strategy_def['name']} on {symbol}. "\
+                         f"Total return: {results['total_return_pct']:.2%}, "\
+                         f"Win rate: {results['win_rate']:.2%}, "\
+                         f"Sharpe ratio: {results['sharpe_ratio']:.2f}."
+        
+        # STEP 6: Generate voice narration (if requested)
+        voice_audio = None
+        if include_voice:
+            from voice.brief_narrator import brief_narrator
+            
+            try:
+                audio_bytes = await brief_narrator.generate_voice(
+                    text=explanation,
+                    user_id=user_id
+                )
+                if audio_bytes:
+                    voice_audio = brief_narrator.encode_audio(audio_bytes)
+                    logger.info(f"Voice narration generated: {len(audio_bytes)} bytes")
+                else:
+                    logger.warning("Voice generation returned None")
+            except Exception as e:
+                logger.error(f"Voice generation failed: {e}")
+                # Continue without voice (graceful degradation)
+        
+        # STEP 7: Return comprehensive response
+        response = {
             'symbol': symbol,
-            'strategy': strategy_def.get('name', 'Custom'),
-            'metrics': results,  # Return metrics directly
+            'strategy': strategy_def,
+            'metrics': results,
+            'explanation': explanation,
             'period': f"{start_date} to {end_date}",
             'initial_capital': initial_capital
         }
+        
+        # Add voice if available
+        if voice_audio:
+            response['voice_audio_base64'] = voice_audio
+        
+        logger.info(f"Enhanced backtest response prepared for {symbol}")
+        
+        return response
         
     except HTTPException:
         raise
