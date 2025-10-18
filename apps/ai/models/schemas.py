@@ -79,16 +79,20 @@ class RecommendationResponse(BaseModel):
     sources: List[Source]
     timestamp: datetime
 
-class MorningBriefRequest(BaseModel):
-    """Request for morning brief"""
+class BriefRequest(BaseModel):
+    """Request schema for market briefs"""
+    watchlist: List[str] = Field(..., min_length=1, max_length=20, description="List of symbols to analyze")
+    market: str = Field(..., description="Market name (US, SGX, LSE, etc)")
     user_id: str
+    include_voice: bool = True
 
-class MorningBriefResponse(BaseModel):
-    """Morning brief response"""
-    summary: str
-    market_overview: str
-    portfolio_status: dict
-    recommendations: List[RecommendationResponse]
-    audio_url: Optional[str] = None
-    timestamp: datetime
+class BriefResponse(BaseModel):
+    """Response schema for market briefs"""
+    type: str  # "morning" or "eod"
+    text: str
+    audio_base64: Optional[str] = None
+    symbols_analyzed: List[str]
+    sentiment_summary: Optional[dict] = None
+    performance_summary: Optional[dict] = None
+    generated_at: str
 

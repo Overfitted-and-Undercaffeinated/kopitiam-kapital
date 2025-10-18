@@ -332,12 +332,113 @@ async def test_7_error_handling():
         traceback.print_exc()
         return False, None
 
+async def test_8_morning_brief():
+    """Test morning brief generation with voice"""
+    print("\n" + "="*80)
+    print("TEST 8: MORNING BRIEF WITH VOICE")
+    print("="*80)
+    
+    try:
+        from agents.morning_brief import morning_brief_agent
+        
+        watchlist = ["NVDA", "TSLA"]
+        
+        print(f"  Generating morning brief for watchlist: {watchlist}")
+        
+        brief = await morning_brief_agent.generate_brief(
+            watchlist=watchlist,
+            market="US",
+            user_id="test_user",
+            include_voice=True
+        )
+        
+        print(f"\n[OK] Morning brief generated:")
+        print(f"  Type: {brief['type']}")
+        print(f"  Text length: {len(brief['text'])} chars (target: <1000)")
+        print(f"  Symbols analyzed: {brief['symbols_analyzed']}")
+        print(f"  Has voice: {brief['audio_base64'] is not None}")
+        
+        # Check text length (should be <2 min read, ~400 words, ~2000 chars)
+        assert len(brief['text']) < 2000, f"Brief too long: {len(brief['text'])} chars"
+        assert len(brief['symbols_analyzed']) == len(watchlist), "Not all symbols analyzed"
+        
+        print(f"\n  Brief preview:")
+        print(f"  {brief['text'][:200]}...")
+        
+        if brief['audio_base64']:
+            print(f"\n  [OK] Voice narration generated!")
+            print(f"    Audio size: {len(brief['audio_base64'])} bytes (base64)")
+        else:
+            print(f"\n  [WARN] No voice (ElevenLabs might be disabled)")
+        
+        return True, brief
+        
+    except Exception as e:
+        print(f"[ERROR] Morning brief test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False, None
+
+async def test_9_eod_brief():
+    """Test EOD brief generation with voice"""
+    print("\n" + "="*80)
+    print("TEST 9: EOD BRIEF WITH VOICE")
+    print("="*80)
+    
+    try:
+        from agents.eod_brief import eod_brief_agent
+        
+        watchlist = ["AAPL", "MSFT"]
+        
+        print(f"  Generating EOD brief for watchlist: {watchlist}")
+        
+        brief = await eod_brief_agent.generate_brief(
+            watchlist=watchlist,
+            market="US",
+            user_id="test_user",
+            include_voice=True
+        )
+        
+        print(f"\n[OK] EOD brief generated:")
+        print(f"  Type: {brief['type']}")
+        print(f"  Text length: {len(brief['text'])} chars (target: <1000)")
+        print(f"  Symbols analyzed: {brief['symbols_analyzed']}")
+        print(f"  Has voice: {brief['audio_base64'] is not None}")
+        
+        # Check performance summary
+        perf_summary = brief['performance_summary']
+        print(f"\n  Performance Summary:")
+        print(f"    Gainers: {perf_summary['gainers']}")
+        print(f"    Losers: {perf_summary['losers']}")
+        print(f"    Avg change: {perf_summary['average_change']:.2f}%")
+        
+        # Check text length
+        assert len(brief['text']) < 2000, f"Brief too long: {len(brief['text'])} chars"
+        assert len(brief['symbols_analyzed']) == len(watchlist), "Not all symbols analyzed"
+        
+        print(f"\n  Brief preview:")
+        print(f"  {brief['text'][:200]}...")
+        
+        if brief['audio_base64']:
+            print(f"\n  [OK] Voice narration generated!")
+            print(f"    Audio size: {len(brief['audio_base64'])} bytes (base64)")
+        else:
+            print(f"\n  [WARN] No voice (ElevenLabs might be disabled)")
+        
+        return True, brief
+        
+    except Exception as e:
+        print(f"[ERROR] EOD brief test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False, None
+
 async def run_all_tests():
     """Run all integration tests"""
     print("\n" + "="*80)
     print("KOPITIAM CAPITAL - COMPREHENSIVE INTEGRATION TEST")
     print("="*80)
-    print("\nTesting all 3 differentiators + integration...")
+    print("\nTesting all 3 differentiators + integration + voice briefs...")
     
     tests = [
         ("Sentiment Analysis", test_1_sentiment_analysis),
@@ -347,6 +448,8 @@ async def run_all_tests():
         ("WebSocket Manager", test_5_websocket_connection_manager),
         ("Complete Demo Flow", test_6_complete_demo_flow),
         ("Error Handling", test_7_error_handling),
+        ("Morning Brief with Voice", test_8_morning_brief),
+        ("EOD Brief with Voice", test_9_eod_brief),
     ]
     
     results = {}

@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import models and agents
-from models.schemas import RouterRequest, RouterResponse
+from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse
 from agents.router import RouterAgent
 
 # Create FastAPI app
@@ -480,6 +480,109 @@ async def get_sentiment(symbol: str, user_id: str = None):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get sentiment: {str(e)}"
+        )
+
+# ============================================================================
+# BRIEF ENDPOINTS
+# ============================================================================
+
+@app.post("/briefs/morning", response_model=BriefResponse)
+async def generate_morning_brief(request: BriefRequest):
+    """
+    Generate morning market brief with voice narration
+    
+    Features:
+    - Watchlist sentiment analysis
+    - Pre-market movers identification  
+    - Personalized insights from Mem0
+    - Voice narration with ElevenLabs
+    - <2 minute read/listen
+    
+    Request body:
+        {
+            "watchlist": ["NVDA", "TSLA", "AAPL"],
+            "market": "US",
+            "user_id": "user123",
+            "include_voice": true
+        }
+    
+    Returns:
+        {
+            "type": "morning",
+            "text": "Good morning! Market overview...",
+            "audio_base64": "base64_encoded_mp3...",
+            "symbols_analyzed": ["NVDA", "TSLA", "AAPL"],
+            "sentiment_summary": {...},
+            "generated_at": "2025-10-18T10:00:00Z"
+        }
+    """
+    try:
+        from agents.morning_brief import morning_brief_agent
+        
+        brief = await morning_brief_agent.generate_brief(
+            watchlist=request.watchlist,
+            market=request.market,
+            user_id=request.user_id,
+            include_voice=request.include_voice
+        )
+        
+        return brief
+    
+    except Exception as e:
+        logger.error(f"Error generating morning brief: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate morning brief: {str(e)}"
+        )
+
+@app.post("/briefs/eod", response_model=BriefResponse)
+async def generate_eod_brief(request: BriefRequest):
+    """
+    Generate end-of-day market brief with voice narration
+    
+    Features:
+    - Watchlist performance tracking (day's % change)
+    - Sentiment analysis
+    - AI research on why top movers moved
+    - Tomorrow's outlook prediction
+    - Voice narration with ElevenLabs
+    - <2 minute read/listen
+    
+    Request body:
+        {
+            "watchlist": ["NVDA", "TSLA", "AAPL"],
+            "market": "US",
+            "user_id": "user123",
+            "include_voice": true
+        }
+    
+    Returns:
+        {
+            "type": "eod",
+            "text": "Market close for US...",
+            "audio_base64": "base64_encoded_mp3...",
+            "symbols_analyzed": ["NVDA", "TSLA", "AAPL"],
+            "performance_summary": {...},
+            "generated_at": "2025-10-18T16:00:00Z"
+        }
+    """
+    try:
+        from agents.eod_brief import eod_brief_agent
+        
+        brief = await eod_brief_agent.generate_brief(
+            watchlist=request.watchlist,
+            market=request.market,
+            user_id=request.user_id,
+            include_voice=request.include_voice
+        )
+        
+        return brief
+    
+    except Exception as e:
+        logger.error(f"Error generating EOD brief: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate EOD brief: {str(e)}"
         )
 
 # ============================================================================

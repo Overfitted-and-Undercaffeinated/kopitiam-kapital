@@ -9,8 +9,9 @@ from .schemas import (
     Source,
     RecommendationRequest,
     RecommendationResponse,
-    MorningBriefRequest,
-    MorningBriefResponse,
+    # Brief schemas
+    BriefRequest,
+    BriefResponse,
 )
 
 __all__ = [
@@ -23,7 +24,8 @@ __all__ = [
     "Source",
     "RecommendationRequest",
     "RecommendationResponse",
-    "MorningBriefRequest",
-    "MorningBriefResponse",
+    # Briefs
+    "BriefRequest",
+    "BriefResponse",
 ]
 
