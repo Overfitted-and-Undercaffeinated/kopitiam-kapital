@@ -136,7 +136,8 @@ class StrategyBuilder:
                     'direction': 'BUY',
                     'entry': entry_price,
                     'stop': stop_price,
-                    'target': target_price
+                    'target': target_price,
+                    'position_size_pct': position_sizing.get('value', 0.10)
                 }
             
             # No signal

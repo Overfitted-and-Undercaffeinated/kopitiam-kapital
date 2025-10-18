@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # Testing Modes
     enable_api_calls: bool = True  # Set to False for testing without API calls
     use_mock_llm: bool = False  # Use mock LLM responses for testing
-    use_mock_market_data: bool = True  # Use mock market data
+    use_mock_market_data: bool = True  # Use mock market data (yfinance API issues)
     use_mock_exa: bool = False  # Use REAL Exa.ai API (was mocked before)
     stocktwits_enabled: bool = False  # StockTwits disabled (removed from sentiment analysis)
     

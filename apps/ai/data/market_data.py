@@ -169,18 +169,36 @@ class MarketDataService:
         return float(base_price % 1000 + 100)
     
     def _mock_ohlcv(self, symbol: str, period: str) -> pd.DataFrame:
-        """Generate mock OHLCV data for testing"""
+        """Generate realistic mock OHLCV data for testing"""
         days = self._period_to_days(period)
         base_price = self._mock_price(symbol)
         
+        # Generate realistic price movements with volatility
+        import numpy as np
+        np.random.seed(42)  # For reproducible results
+        
         dates = pd.date_range(end=datetime.now(), periods=days)
+        
+        # Create price movements with some volatility
+        price_changes = np.random.normal(0, 2, days)  # Random price changes
+        prices = [base_price]
+        
+        for change in price_changes[1:]:
+            new_price = prices[-1] + change
+            prices.append(max(new_price, base_price * 0.5))  # Keep prices reasonable
+        
+        # Generate OHLC from close prices
         data = pd.DataFrame({
-            'Open': [base_price + i for i in range(days)],
-            'High': [base_price + i + 5 for i in range(days)],
-            'Low': [base_price + i - 5 for i in range(days)],
-            'Close': [base_price + i + 2 for i in range(days)],
-            'Volume': [1000000 + i * 10000 for i in range(days)]
+            'Open': [p + np.random.uniform(-1, 1) for p in prices],
+            'High': [p + np.random.uniform(0, 3) for p in prices],
+            'Low': [p - np.random.uniform(0, 3) for p in prices],
+            'Close': prices,
+            'Volume': [int(1000000 + np.random.uniform(-200000, 500000)) for _ in range(days)]
         }, index=dates)
+        
+        # Ensure High >= Low and High >= Open, Close
+        data['High'] = data[['Open', 'High', 'Close']].max(axis=1)
+        data['Low'] = data[['Open', 'Low', 'Close']].min(axis=1)
         
         return data
     
