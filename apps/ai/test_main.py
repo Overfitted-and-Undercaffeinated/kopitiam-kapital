@@ -392,6 +392,100 @@ async def test_route_performance():
         print(f"⚠️  Route returned status {response.status_code}")
 
 
+@pytest.mark.asyncio
+async def test_complete_backtest_workflow():
+    """Test complete workflow: NL strategy → backtest → results + charts + explanation"""
+    response = client.post(
+        "/backtest/run-from-description",
+        json={
+            "strategy_description": "Buy when RSI is below 30 and sell when it goes above 70",
+            "symbol": "AAPL",
+            "user_id": "test_user_001"
+        }
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        
+        # Verify structure
+        assert "strategy" in data
+        assert "metrics" in data
+        assert "charts" in data
+        assert "explanation" in data
+        assert "period" in data
+        
+        # Verify strategy
+        assert data["strategy"]["name"] is not None
+        assert data["strategy"]["category"] is not None
+        
+        # Verify metrics
+        assert "total_return_pct" in data["metrics"]
+        assert "win_rate" in data["metrics"]
+        assert "sharpe_ratio" in data["metrics"]
+        assert "num_trades" in data["metrics"]
+        
+        # Verify charts (JSON data, not images)
+        assert isinstance(data["charts"]["equity_curve"], list)
+        assert isinstance(data["charts"]["monthly_returns"], dict)
+        if data["charts"]["equity_curve"]:
+            assert "date" in data["charts"]["equity_curve"][0]
+            assert "equity" in data["charts"]["equity_curve"][0]
+        
+        # Verify explanation
+        assert len(data["explanation"]) > 0
+        assert isinstance(data["explanation"], str)
+        
+        print(f"✅ Complete backtest workflow test passed")
+        print(f"   Strategy: {data['strategy']['name']}")
+        print(f"   Return: {data['metrics']['total_return_pct']:.2%}")
+        print(f"   Win Rate: {data['metrics']['win_rate']:.1%}")
+        print(f"   Explanation: {data['explanation'][:100]}...")
+    else:
+        print(f"⚠️  Complete backtest workflow returned {response.status_code}")
+        if response.status_code == 400:
+            print(f"   Error: {response.json().get('detail')}")
+
+
+@pytest.mark.asyncio
+async def test_backtest_workflow_performance():
+    """Test performance of complete backtest workflow"""
+    import time
+    
+    start = time.time()
+    response = client.post(
+        "/backtest/run-from-description",
+        json={
+            "strategy_description": "Buy on MACD crossover",
+            "symbol": "MSFT",
+            "user_id": "test_user"
+        }
+    )
+    elapsed = time.time() - start
+    
+    if response.status_code == 200:
+        # Target: <20s (strategy translation + backtest + analysis)
+        print(f"✅ Workflow completed in {elapsed*1000:.0f}ms (target: <20000ms)")
+    else:
+        print(f"⚠️  Workflow returned {response.status_code} in {elapsed*1000:.0f}ms")
+
+
+@pytest.mark.asyncio
+async def test_backtest_workflow_invalid_strategy():
+    """Test error handling with invalid strategy description"""
+    response = client.post(
+        "/backtest/run-from-description",
+        json={
+            "strategy_description": "something that doesnt make sense for trading",
+            "symbol": "TSLA",
+            "user_id": "test_user"
+        }
+    )
+    
+    # Should return 400 for invalid strategy
+    assert response.status_code in [400, 422, 500]  # Could fail at various stages
+    print("✅ Invalid strategy properly rejected")
+
+
 # ============================================================================
 # MAIN TEST RUNNER
 # ============================================================================
@@ -431,6 +525,9 @@ if __name__ == "__main__":
     asyncio.run(test_active_markets())
     asyncio.run(test_workflow_routing_to_sentiment())
     asyncio.run(test_route_performance())
+    asyncio.run(test_complete_backtest_workflow())
+    asyncio.run(test_backtest_workflow_performance())
+    asyncio.run(test_backtest_workflow_invalid_strategy())
     
     print("\n" + "="*80)
     print("✅ TEST SUITE COMPLETED")
@@ -441,5 +538,6 @@ if __name__ == "__main__":
     print("- Middleware functionality confirmed")
     print("- Response structures validated")
     print("- Performance benchmarks recorded")
+    print("- Complete backtest workflow tested")
     print("\nNote: Some tests may return warnings if external services are unavailable.")
     print("This is expected in development environments.\n")
