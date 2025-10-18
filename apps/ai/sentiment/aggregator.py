@@ -1,6 +1,6 @@
 """
-Sentiment aggregator - combines all sentiment sources
-Weights: News 100% (Exa.ai only), Reddit disabled
+Sentiment aggregator - Exa.ai news sentiment only
+No Reddit or StockTwits
 """
 from typing import Dict, Optional, List
 import logging
@@ -9,11 +9,9 @@ from datetime import datetime
 # Flexible imports
 try:
     from ..sentiment.news_sentiment import news_sentiment_analyzer
-    # from ..sentiment.social_scraper import social_sentiment_analyzer  # Commented out - Reddit disabled
     from ..utils.config import settings
 except ImportError:
     from sentiment.news_sentiment import news_sentiment_analyzer
-    # from sentiment.social_scraper import social_sentiment_analyzer  # Commented out - Reddit disabled
     from utils.config import settings
 
 logger = logging.getLogger(__name__)
@@ -21,8 +19,6 @@ logger = logging.getLogger(__name__)
 # Sentiment weights - Exa.ai (News) only
 WEIGHTS = {
     'news': 1.00,  # 100% weightage to Exa.ai news sentiment
-    'reddit': 0.00,  # Disabled - commented out
-    'stocktwits': 0.00  # Disabled
 }
 
 class SentimentAggregator:
@@ -66,30 +62,13 @@ class SentimentAggregator:
             # Fetch from news source only (Exa.ai)
             news_result = await news_sentiment_analyzer.analyze(symbol, lookback_hours, user_id)
             
-            # REDDIT AND SOCIAL SENTIMENT DISABLED
-            # social_task = social_sentiment_analyzer.analyze(symbol, lookback_hours, user_id)
-            # news_result, social_result = await asyncio.gather(
-            #     news_task,
-            #     social_task,
-            #     return_exceptions=True
-            # )
-            
             # Handle exceptions
             if isinstance(news_result, Exception):
                 logger.error(f"News sentiment failed: {news_result}")
                 news_result = {'score': 0.5, 'article_count': 0}
             
-            # Mock social results (Reddit disabled)
-            social_result = {
-                'combined_score': 0.5,
-                'reddit': {'score': 0.5, 'mention_count': 0},
-                'stocktwits': {'score': 0.5, 'message_count': 0}
-            }
-            
             # Extract individual scores
             news_score = news_result.get('score', 0.5)
-            reddit_score = 0.5  # Disabled
-            stocktwits_score = 0.5  # Disabled
             
             # Calculate weighted overall score (100% from news/Exa.ai)
             overall_score = news_score * WEIGHTS['news']
@@ -126,18 +105,14 @@ class SentimentAggregator:
                 'direction': direction,
                 'sentiment_breakdown': {
                     'news': round(news_score, 2),
-                    'reddit': round(reddit_score, 2),
-                    'stocktwits': round(stocktwits_score, 2)
                 },
                 'volume': {
                     'news_articles': news_result.get('article_count', 0),
-                    'reddit_mentions': social_result.get('reddit', {}).get('mention_count', 0),
-                    'stocktwits_messages': social_result.get('stocktwits', {}).get('message_count', 0)
                 },
                 'trending': trending,
                 'contrarian_signal': contrarian_signal,
                 'confidence': round(confidence, 2),
-                'top_sources': self._compile_top_sources(news_result, social_result),
+                'top_sources': self._compile_top_sources(news_result),
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -163,7 +138,7 @@ class SentimentAggregator:
         
         return variance
     
-    def _compile_top_sources(self, news_result: Dict, social_result: Dict) -> List[Dict]:
+    def _compile_top_sources(self, news_result: Dict) -> List[Dict]:
         """Compile top sources from news only (Reddit disabled)"""
         sources = []
         
@@ -174,18 +149,9 @@ class SentimentAggregator:
                 'title': article['title'],
                 'url': article['url'],
                 'sentiment_score': article.get('sentiment_score', 0.5),
+                'sentiment_reasoning': article.get('sentiment_reasoning', 'No reasoning available'),
                 'published_date': article.get('published_date')
             })
-        
-        # REDDIT DISABLED
-        # for post in social_result.get('reddit', {}).get('top_posts', [])[:2]:
-        #     sources.append({
-        #         'type': 'reddit',
-        #         'title': post['title'],
-        #         'url': post['url'],
-        #         'sentiment_score': post['score'],
-        #         'engagement': post.get('upvotes', 0)
-        #     })
         
         return sources
     
@@ -197,13 +163,9 @@ class SentimentAggregator:
             'direction': 'neutral',
             'sentiment_breakdown': {
                 'news': 0.5,
-                'reddit': 0.5,
-                'stocktwits': 0.5
             },
             'volume': {
                 'news_articles': 0,
-                'reddit_mentions': 0,
-                'stocktwits_messages': 0
             },
             'trending': False,
             'contrarian_signal': False,

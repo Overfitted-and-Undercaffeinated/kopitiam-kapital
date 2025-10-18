@@ -406,8 +406,7 @@ Sentiment Analysis:
 - Overall Score: {sentiment['overall_score']:.2f} ({sentiment['direction']})
 - Confidence: {sentiment['confidence']:.2f}
 - Trending: {sentiment['trending']}
-- News: {sentiment['sentiment_breakdown']['news']:.2f}
-- Social: {sentiment['sentiment_breakdown']['reddit']:.2f}
+- News Articles: {sentiment['volume']['news_articles']}
 
 Backtest Validation (RSI Oversold Strategy, 1 year):
 - Win Rate: {backtest['win_rate']:.1%}

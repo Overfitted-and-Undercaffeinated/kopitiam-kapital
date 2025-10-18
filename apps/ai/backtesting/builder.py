@@ -41,7 +41,7 @@ class StrategyBuilder:
     def __init__(self):
         logger.info("Initialized Strategy Builder")
     
-    def build_strategy(self, strategy_def: Dict) -> Callable:
+    async def build_strategy(self, strategy_def: Dict) -> Callable:
         """
         Build executable strategy function from JSON definition
         
@@ -83,16 +83,53 @@ class StrategyBuilder:
             if should_enter:
                 entry_price = current['close']
                 
-                # Calculate stop and target based on risk management
+                # Calculate stop and target based on risk management with MCP
                 risk_mgmt = strategy_def.get('risk_management', {})
-                stop_loss_pct = risk_mgmt.get('stop_loss_percent', 0.05)
+                
+                # Try to use MCP for ATR-based stop optimization
+                from utils.mcp_client import mcp_risk_client
+                from data.indicators import calculate_atr
+                
+                try:
+                    # Calculate ATR for dynamic stops
+                    atr_values = calculate_atr(data, period=14)
+                    current_atr = atr_values.iloc[-1] if len(atr_values) > 0 else 0
+                    
+                    # Use MCP for ATR-based stop optimization
+                    if mcp_risk_client.enabled and current_atr > 0:
+                        stop_result = await mcp_risk_client.optimize_stop_loss(
+                            entry_price=entry_price,
+                            atr=current_atr,
+                            risk_tolerance=risk_mgmt.get('risk_tolerance', 'moderate'),
+                            direction='BUY'
+                        )
+                        
+                        if not stop_result:
+                            raise RuntimeError("MCP stop loss optimization failed")
+                        
+                        stop_price = stop_result['stop_loss']
+                        logger.info(f"MCP optimized stop: ${stop_price} ({stop_result['atr_multiplier']}x ATR)")
+                    else:
+                        if not mcp_risk_client.enabled:
+                            raise RuntimeError("MCP Risk Tools required for dynamic stop optimization")
+                        # Fallback if ATR is 0
+                        stop_loss_pct = risk_mgmt.get('stop_loss_percent', 0.05)
+                        stop_price = entry_price * (1 - stop_loss_pct)
+                except Exception as e:
+                    # Fallback to fixed percentage if MCP fails
+                    logger.warning(f"MCP stop optimization unavailable: {e}, using fixed %")
+                    stop_loss_pct = risk_mgmt.get('stop_loss_percent', 0.05)
+                    stop_price = entry_price * (1 - stop_loss_pct)
+                
+                # Take profit remains percentage-based
                 take_profit_pct = risk_mgmt.get('take_profit_percent', 0.10)
+                target_price = entry_price * (1 + take_profit_pct)
                 
                 return {
                     'direction': 'BUY',
                     'entry': entry_price,
-                    'stop': entry_price * (1 - stop_loss_pct),
-                    'target': entry_price * (1 + take_profit_pct)
+                    'stop': stop_price,
+                    'target': target_price
                 }
             
             # No signal

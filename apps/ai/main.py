@@ -183,6 +183,49 @@ async def health_check():
         }
     }
 
+@app.get("/system/capabilities")
+async def get_system_capabilities():
+    """
+    Show what advanced features are available
+    
+    Returns system capabilities including MCP server status.
+    All features require MCP to be operational.
+    """
+    from utils.mcp_client import mcp_risk_client
+    
+    if not mcp_risk_client.enabled:
+        return {
+            "mcp_risk_tools": {
+                "enabled": False,
+                "status": "unavailable",
+                "error": "MCP server not running. Please ensure Node.js is installed.",
+                "features": []
+            },
+            "system_status": "degraded"
+        }
+    
+    return {
+        "mcp_risk_tools": {
+            "enabled": True,
+            "status": "operational",
+            "features": [
+                "Kelly Criterion position sizing",
+                "Professional VaR calculations",
+                "ATR-based stop optimization",
+                "Risk/reward analysis",
+                "Time-scaled portfolio risk metrics"
+            ],
+            "server_version": "1.0.0"
+        },
+        "ai_models": {
+            "groq": "llama-3.3-70b-versatile",
+            "openai": "gpt-4o",
+            "voice": "elevenlabs"
+        },
+        "data_sources": ["yfinance", "alpha_vantage", "reddit", "exa"],
+        "system_status": "operational"
+    }
+
 @app.post("/ai/route", response_model=RouterResponse)
 async def route_query(request: RouterRequest):
     """
@@ -728,7 +771,7 @@ async def run_backtest(
         logger.info(f"Backtesting period: {start_date} to {end_date}")
         
         # STEP 3: Build and run strategy
-        strategy_func = strategy_builder.build_strategy(strategy_def)
+        strategy_func = await strategy_builder.build_strategy(strategy_def)
         engine = BacktestEngine()
         
         results = await engine.run_backtest(
