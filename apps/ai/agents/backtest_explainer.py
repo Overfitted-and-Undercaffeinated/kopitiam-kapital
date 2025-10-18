@@ -103,8 +103,41 @@ class BacktestExplainerAgent:
         start_time = time.time()
         
         try:
+            # Calculate risk/reward using MCP
+            from utils.mcp_client import mcp_risk_client
+            
+            risk_reward_text = ""
+            if mcp_risk_client.enabled:
+                avg_win = metrics.get('avg_win', 0)
+                avg_loss = abs(metrics.get('avg_loss', 0))
+                
+                if avg_win > 0 and avg_loss > 0:
+                    risk_reward = await mcp_risk_client.calculate_risk_reward(
+                        entry_price=100,  # Normalized
+                        stop_loss=100 - avg_loss,
+                        take_profit=100 + avg_win,
+                        win_rate=metrics['win_rate'],
+                        position_size=1
+                    )
+                    
+                    if not risk_reward:
+                        raise RuntimeError("MCP risk/reward calculation failed")
+                    
+                    risk_reward_text = f"""
+Risk/Reward Analysis (MCP-Powered):
+- Risk/Reward Ratio: {risk_reward['risk_reward_ratio']}
+- Expected Value: ${risk_reward['expected_value']}
+- Assessment: {risk_reward['recommendation']}
+"""
+            else:
+                raise RuntimeError("MCP Risk Tools required for professional analysis")
+            
             # Format metrics for prompt
             formatted_metrics = self._format_metrics(metrics)
+            
+            # Add risk/reward to formatted metrics
+            if risk_reward_text:
+                formatted_metrics += f"\n\n{risk_reward_text}"
             
             # Generate explanation using Groq
             explanation = await self._call_groq(

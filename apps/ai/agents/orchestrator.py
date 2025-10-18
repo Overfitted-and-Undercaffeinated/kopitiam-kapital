@@ -177,7 +177,7 @@ class OrchestratorAgent:
             'symbol': symbol,
             'result': {
                 'sentiment': sentiment,
-                'analysis': f"Comprehensive analysis for {symbol} based on {sentiment['volume']['news_articles']} articles and {sentiment['volume']['reddit_mentions'] + sentiment['volume']['stocktwits_messages']} social mentions.",
+                'analysis': f"Comprehensive sentiment analysis for {symbol} based on {sentiment['volume']['news_articles']} news articles.",
                 'recommendation': 'See /ai/recommend for trading recommendation'
             }
         }
