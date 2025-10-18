@@ -209,16 +209,16 @@ class RiskToolsServer {
       try {
         switch (name) {
           case 'calculate_position_size':
-            return await this.handlePositionSize(args as PositionSizingParams);
+            return await this.handlePositionSize(args as unknown as PositionSizingParams);
 
           case 'calculate_var':
-            return await this.handleVaR(args as VaRParams);
+            return await this.handleVaR(args as unknown as VaRParams);
 
           case 'optimize_stop_loss':
-            return await this.handleOptimizeStopLoss(args);
+            return await this.handleOptimizeStopLoss(args as unknown as any);
 
           case 'calculate_risk_reward':
-            return await this.handleRiskReward(args as RiskRewardParams);
+            return await this.handleRiskReward(args as unknown as RiskRewardParams);
 
           default:
             throw new Error(`Unknown tool: ${name}`);

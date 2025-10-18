@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import models and agents
-from models.schemas import RouterRequest, RouterResponse
+from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse
 from agents.router import RouterAgent
 
 # Create FastAPI app
@@ -45,6 +45,9 @@ app.add_middleware(
 # Initialize agents
 router_agent = RouterAgent()
 
+# Store conversation histories per workspace
+workspace_chat_histories: Dict[str, list] = {}
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Log all requests with timing"""
@@ -57,6 +60,82 @@ async def log_requests(request: Request, call_next):
         f"(status: {response.status_code})"
     )
     return response
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """
+    Rate limiting middleware for API endpoints
+    
+    Applies limits based on endpoint and user tier
+    Free tier: 5 req/day, Pro: unlimited, Enterprise: unlimited
+    """
+    # Skip rate limiting for health check and docs
+    if request.url.path in ["/health", "/docs", "/openapi.json"]:
+        return await call_next(request)
+    
+    # Get user_id from query params or body
+    user_id = request.query_params.get('user_id')
+    
+    if not user_id:
+        # Try to get from JSON body for POST requests
+        if request.method == "POST":
+            try:
+                body = await request.body()
+                if body:
+                    import json
+                    data = json.loads(body)
+                    user_id = data.get('user_id')
+                    # Re-populate body for downstream handlers
+                    request._body = body
+            except:
+                pass
+    
+    # If still no user_id, allow request (guest mode)
+    if not user_id:
+        return await call_next(request)
+    
+    # Check rate limit
+    from utils.rate_limiter import rate_limiter
+    
+    # Define limits per endpoint
+    endpoint_limits = {
+        '/sentiment': (10, 3600),  # 10 per hour for free tier
+        '/ai/recommend': (5, 86400),  # 5 per day for free tier
+        '/ai/orchestrate': (5, 86400),  # 5 per day
+        '/backtest/run': (3, 86400),  # 3 per day
+    }
+    
+    # Get limit for this endpoint
+    for endpoint_prefix, (max_calls, window) in endpoint_limits.items():
+        if request.url.path.startswith(endpoint_prefix):
+            rate_limit_key = f"{endpoint_prefix}:{user_id}"
+            
+            # Check limit (only if rate limiting enabled)
+            from utils.config import settings
+            if settings.enable_rate_limiting:
+                allowed = await rate_limiter.check_limit(
+                    key=rate_limit_key,
+                    max_calls=max_calls,
+                    window_seconds=window
+                )
+                
+                if not allowed:
+                    remaining = await rate_limiter.get_remaining(rate_limit_key, max_calls, window)
+                    
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "error": "Rate limit exceeded",
+                            "message": f"You've used your {max_calls} free requests. Upgrade to Pro for unlimited access.",
+                            "limit": max_calls,
+                            "remaining": remaining,
+                            "window_seconds": window,
+                            "upgrade_url": "https://kopitiamcapital.com/pricing"
+                        }
+                    )
+            break
+    
+    return await call_next(request)
 
 @app.get("/health")
 async def health_check():
@@ -404,6 +483,109 @@ async def get_sentiment(symbol: str, user_id: str = None):
         )
 
 # ============================================================================
+# BRIEF ENDPOINTS
+# ============================================================================
+
+@app.post("/briefs/morning", response_model=BriefResponse)
+async def generate_morning_brief(request: BriefRequest):
+    """
+    Generate morning market brief with voice narration
+    
+    Features:
+    - Watchlist sentiment analysis
+    - Pre-market movers identification  
+    - Personalized insights from Mem0
+    - Voice narration with ElevenLabs
+    - <2 minute read/listen
+    
+    Request body:
+        {
+            "watchlist": ["NVDA", "TSLA", "AAPL"],
+            "market": "US",
+            "user_id": "user123",
+            "include_voice": true
+        }
+    
+    Returns:
+        {
+            "type": "morning",
+            "text": "Good morning! Market overview...",
+            "audio_base64": "base64_encoded_mp3...",
+            "symbols_analyzed": ["NVDA", "TSLA", "AAPL"],
+            "sentiment_summary": {...},
+            "generated_at": "2025-10-18T10:00:00Z"
+        }
+    """
+    try:
+        from agents.morning_brief import morning_brief_agent
+        
+        brief = await morning_brief_agent.generate_brief(
+            watchlist=request.watchlist,
+            market=request.market,
+            user_id=request.user_id,
+            include_voice=request.include_voice
+        )
+        
+        return brief
+    
+    except Exception as e:
+        logger.error(f"Error generating morning brief: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate morning brief: {str(e)}"
+        )
+
+@app.post("/briefs/eod", response_model=BriefResponse)
+async def generate_eod_brief(request: BriefRequest):
+    """
+    Generate end-of-day market brief with voice narration
+    
+    Features:
+    - Watchlist performance tracking (day's % change)
+    - Sentiment analysis
+    - AI research on why top movers moved
+    - Tomorrow's outlook prediction
+    - Voice narration with ElevenLabs
+    - <2 minute read/listen
+    
+    Request body:
+        {
+            "watchlist": ["NVDA", "TSLA", "AAPL"],
+            "market": "US",
+            "user_id": "user123",
+            "include_voice": true
+        }
+    
+    Returns:
+        {
+            "type": "eod",
+            "text": "Market close for US...",
+            "audio_base64": "base64_encoded_mp3...",
+            "symbols_analyzed": ["NVDA", "TSLA", "AAPL"],
+            "performance_summary": {...},
+            "generated_at": "2025-10-18T16:00:00Z"
+        }
+    """
+    try:
+        from agents.eod_brief import eod_brief_agent
+        
+        brief = await eod_brief_agent.generate_brief(
+            watchlist=request.watchlist,
+            market=request.market,
+            user_id=request.user_id,
+            include_voice=request.include_voice
+        )
+        
+        return brief
+    
+    except Exception as e:
+        logger.error(f"Error generating EOD brief: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate EOD brief: {str(e)}"
+        )
+
+# ============================================================================
 # WEBSOCKET & COLLABORATION ENDPOINTS
 # ============================================================================
 
@@ -451,6 +633,21 @@ async def websocket_endpoint(
                 # User sent a chat message
                 message = data.get('message', '')
                 
+                # Initialize workspace history if needed
+                if workspace_id not in workspace_chat_histories:
+                    workspace_chat_histories[workspace_id] = []
+                
+                # Add user message to history
+                workspace_chat_histories[workspace_id].append({
+                    'user': user_email,
+                    'message': message,
+                    'timestamp': time.time()
+                })
+                
+                # Keep last 50 messages
+                if len(workspace_chat_histories[workspace_id]) > 50:
+                    workspace_chat_histories[workspace_id] = workspace_chat_histories[workspace_id][-50:]
+                
                 # Broadcast to workspace
                 await connection_manager.broadcast_to_workspace(
                     workspace_id=workspace_id,
@@ -462,6 +659,9 @@ async def websocket_endpoint(
                     }
                 )
                 
+                # Add history to AI agent
+                chat_ai_agent.chat_history[workspace_id] = workspace_chat_histories[workspace_id]
+                
                 # Check if AI should respond
                 should_respond, ai_response = await chat_ai_agent.handle_message(
                     message=message,
@@ -470,6 +670,13 @@ async def websocket_endpoint(
                 )
                 
                 if should_respond:
+                    # Add AI response to history
+                    workspace_chat_histories[workspace_id].append({
+                        'user': 'AI Assistant',
+                        'message': ai_response['message'],
+                        'timestamp': time.time()
+                    })
+                    
                     # AI responds
                     await connection_manager.broadcast_to_workspace(
                         workspace_id=workspace_id,

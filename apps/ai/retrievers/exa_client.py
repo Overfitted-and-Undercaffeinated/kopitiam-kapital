@@ -37,12 +37,14 @@ class ExaClient:
         self.api_key = settings.exa_api_key
         self.client = None
         self._cache = None  # Lazy load to avoid circular imports
+        self.enabled = False  # Track if Exa is actually working
         
         # Initialize client if not in mock mode
         if not settings.use_mock_exa:
             try:
                 from exa_py import Exa
                 self.client = Exa(api_key=self.api_key)
+                self.enabled = True
                 logger.info("Initialized Exa.ai client")
             except ImportError:
                 logger.warning("exa-py not installed. Install with: pip install exa-py")
@@ -93,7 +95,7 @@ class ExaClient:
         
         if not await rate_limiter.check_limit(rate_key, settings.exa_calls_per_hour, 3600):
             logger.warning(f"Exa rate limit exceeded for {rate_key}. Using cached results.")
-            cached = await cache_strategy.get_cached_results(query, "news")
+            cached = await self.cache.get_cached_results(query, "news")
             if cached:
                 return cached
             return []
@@ -104,7 +106,7 @@ class ExaClient:
         
         async def fallback():
             logger.info("Exa search failed, checking cache...")
-            cached = await cache_strategy.get_cached_results(query, "news")
+            cached = await self.cache.get_cached_results(query, "news")
             return cached if cached else []
         
         # Make resilient call
@@ -126,7 +128,7 @@ class ExaClient:
         
         # Cache results
         if results:
-            await cache_strategy.cache_results(query, "news", results, user_id)
+            await self.cache.cache_results(query, "news", results, user_id)
         
         return results or []
     

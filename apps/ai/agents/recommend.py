@@ -17,6 +17,10 @@ try:
     from ..utils.disclaimers import add_disclaimer_to_recommendation
     from ..utils.versioning import versioning
     from ..utils.cost_tracker import cost_tracker
+    from ..memory.mem0_service import mem0_service
+    from ..utils.mcp_client import mcp_risk_client
+    from ..utils.config import settings
+    from ..data.indicators import calculate_atr
 except ImportError:
     from utils.clients import get_openai_client
     from sentiment.aggregator import sentiment_aggregator
@@ -27,6 +31,10 @@ except ImportError:
     from utils.disclaimers import add_disclaimer_to_recommendation
     from utils.versioning import versioning
     from utils.cost_tracker import cost_tracker
+    from memory.mem0_service import mem0_service
+    from utils.mcp_client import mcp_risk_client
+    from utils.config import settings
+    from data.indicators import calculate_atr
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +53,13 @@ class RecommendationAgent:
     def __init__(self):
         self.client = get_openai_client()
         self.model = "gpt-4o-mini"  # Fast and cost-effective
-        logger.info("Initialized Recommendation Agent")
+        self.mem0_enabled = settings.use_mem0
+        self.mcp_enabled = settings.use_mcp_risk_tools
+        
+        logger.info(
+            f"Initialized Recommendation Agent "
+            f"(Mem0: {self.mem0_enabled}, MCP: {self.mcp_enabled})"
+        )
     
     async def generate_recommendation(
         self,
@@ -86,13 +100,20 @@ class RecommendationAgent:
                 logger.warning(f"Invalid price for {symbol}, cannot generate recommendation")
                 raise ValueError(f"Unable to get price for {symbol}")
             
-            # Step 4: Quick backtest validation
+            # Step 4: Get user policy from Mem0
+            user_policy = await mem0_service.get_policy(user_id)
+            logger.info(f"User policy: {user_policy['risk_tolerance']} trader, {user_policy['default_position_size_pct']:.1%} position size")
+            
+            # Step 5: Quick backtest validation
             backtest_result = await self._run_quick_backtest(symbol, user_id)
             
-            # Step 5: Calculate risk parameters
-            risk_params = self._calculate_risk_parameters(
+            # Step 6: Calculate risk parameters (with Mem0 + MCP)
+            risk_params = await self._calculate_risk_parameters_advanced(
+                symbol=symbol,
                 current_price=latest_price,
                 sentiment_score=sentiment['overall_score'],
+                user_policy=user_policy,
+                backtest_result=backtest_result,
                 user_context=user_context
             )
             
@@ -205,49 +226,152 @@ class RecommendationAgent:
             'num_trades': 0
         }
     
-    def _calculate_risk_parameters(
+    async def _calculate_risk_parameters_advanced(
         self,
+        symbol: str,
         current_price: float,
         sentiment_score: float,
+        user_policy: Dict,
+        backtest_result: Dict,
         user_context: Optional[Dict] = None
     ) -> Dict:
         """
-        Calculate risk parameters (simple MVP version)
+        Calculate risk parameters using Mem0 + MCP
         
-        Rules:
-        - Position size: 2.5% of capital (conservative)
-        - Stop loss: 5% below entry
-        - Take profit: 10% above entry (2:1 reward:risk)
+        With Mem0: Uses user's personalized risk tolerance
+        With MCP: Uses Kelly Criterion / ATR-based stops
+        Without: Falls back to simple fixed percentages
         
-        Future: Use MCP risk tools for advanced calculations
+        Args:
+            symbol: Stock symbol
+            current_price: Current price
+            sentiment_score: Sentiment score 0-1
+            user_policy: User policy from Mem0
+            backtest_result: Backtest metrics
+            user_context: Optional additional context
+        
+        Returns:
+            {stop_loss, take_profit, position_size_percent, position_size_shares, method}
         """
-        # Simple fixed percentages for MVP
-        position_size_percent = 0.025  # 2.5% of capital
-        stop_loss_percent = 0.05  # 5% stop loss
-        take_profit_percent = 0.10  # 10% take profit
+        # Start with user policy from Mem0
+        position_size_percent = user_policy.get('default_position_size_pct', 0.025)
+        stop_loss_percent = user_policy.get('default_stop_loss_pct', 0.05)
+        take_profit_percent = user_policy.get('default_take_profit_pct', 0.10)
+        risk_tolerance = user_policy.get('risk_tolerance', 'moderate')
         
-        # Adjust based on sentiment (simple version)
-        if sentiment_score > 0.75:
-            # Very bullish: slightly larger position
-            position_size_percent = 0.03
-        elif sentiment_score < 0.35:
-            # Bearish: smaller position or skip
-            position_size_percent = 0.01
+        logger.info(f"Using Mem0 policy: {risk_tolerance}, {position_size_percent:.1%} position")
         
-        # Calculate prices
-        stop_loss = current_price * (1 - stop_loss_percent)
-        take_profit = current_price * (1 + take_profit_percent)
+        # If MCP available, use advanced calculations
+        if self.mcp_enabled and mcp_risk_client.enabled:
+            logger.info("Using MCP Risk Tools for advanced calculations")
+            
+            try:
+                # Get ATR for stop optimization
+                historical_data = await market_data_service.get_ohlcv(symbol, period="1mo", interval="1d")
+                
+                if not historical_data.empty:
+                    # Normalize columns
+                    historical_data.columns = historical_data.columns.str.lower()
+                    atr_values = calculate_atr(
+                        historical_data['high'],
+                        historical_data['low'],
+                        historical_data['close'],
+                        period=14
+                    )
+                    current_atr = atr_values.iloc[-1] if not atr_values.empty else current_price * 0.02
+                else:
+                    current_atr = current_price * 0.02  # Fallback: 2% of price
+                
+                # Use MCP to optimize stop loss
+                stop_result = await mcp_risk_client.optimize_stop_loss(
+                    entry_price=current_price,
+                    atr=current_atr,
+                    risk_tolerance=risk_tolerance,
+                    direction='BUY'
+                )
+                
+                if stop_result:
+                    stop_loss = stop_result['stop_loss']
+                    logger.info(f"MCP optimized stop: ${stop_loss:.2f} ({stop_result['atr_multiplier']}x ATR)")
+                else:
+                    # Fallback to percentage
+                    stop_loss = current_price * (1 - stop_loss_percent)
+                
+                # Calculate take profit
+                take_profit = current_price * (1 + take_profit_percent)
+                
+                # Use MCP for position sizing (Kelly Criterion if we have backtest data)
+                if backtest_result.get('num_trades', 0) > 10:  # Need enough sample size
+                    win_rate = backtest_result.get('win_rate', 0.5)
+                    avg_win = backtest_result.get('avg_win', 0.08)
+                    avg_loss = abs(backtest_result.get('avg_loss', -0.04))
+                    
+                    portfolio_value = user_context.get('portfolio_value', 100000) if user_context else 100000
+                    
+                    position_result = await mcp_risk_client.calculate_position_size(
+                        method='kelly',
+                        capital=portfolio_value,
+                        current_price=current_price,
+                        win_rate=win_rate,
+                        avg_win=avg_win,
+                        avg_loss=avg_loss,
+                        stop_loss=stop_loss
+                    )
+                    
+                    if position_result:
+                        position_size_shares = position_result['shares']
+                        position_size_percent = position_result['position_value'] / portfolio_value
+                        logger.info(f"MCP Kelly sizing: {position_size_shares} shares ({position_size_percent:.1%})")
+                    else:
+                        # Fallback
+                        portfolio_value = 100000
+                        position_value = portfolio_value * position_size_percent
+                        position_size_shares = int(position_value / current_price)
+                else:
+                    # Not enough backtest data for Kelly, use fixed percent
+                    portfolio_value = 100000
+                    position_value = portfolio_value * position_size_percent
+                    position_size_shares = int(position_value / current_price)
+                
+                # Calculate risk/reward
+                risk_reward_result = await mcp_risk_client.calculate_risk_reward(
+                    entry_price=current_price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    win_rate=backtest_result.get('win_rate', 0.5),
+                    position_size=position_size_shares
+                )
+                
+                if risk_reward_result:
+                    logger.info(
+                        f"MCP Risk/Reward: {risk_reward_result['risk_reward_ratio']:.2f}, "
+                        f"Expected Value: ${risk_reward_result['expected_value']:.2f}"
+                    )
+                
+            except Exception as e:
+                logger.error(f"MCP calculations failed, using simple fallback: {e}")
+                # Fallback to simple calculations
+                stop_loss = current_price * (1 - stop_loss_percent)
+                take_profit = current_price * (1 + take_profit_percent)
+                portfolio_value = 100000
+                position_value = portfolio_value * position_size_percent
+                position_size_shares = int(position_value / current_price)
         
-        # Calculate shares (assume $100k portfolio for MVP)
-        portfolio_value = 100000
-        position_value = portfolio_value * position_size_percent
-        position_size_shares = int(position_value / current_price)
+        else:
+            # Simple calculations without MCP
+            logger.info("Using simple risk calculations (MCP disabled)")
+            stop_loss = current_price * (1 - stop_loss_percent)
+            take_profit = current_price * (1 + take_profit_percent)
+            portfolio_value = 100000
+            position_value = portfolio_value * position_size_percent
+            position_size_shares = int(position_value / current_price)
         
         return {
             'stop_loss': round(stop_loss, 2),
             'take_profit': round(take_profit, 2),
-            'position_size_percent': position_size_percent,
-            'position_size_shares': max(1, position_size_shares)  # At least 1 share
+            'position_size_percent': round(position_size_percent, 4),
+            'position_size_shares': max(1, position_size_shares),
+            'method': 'kelly_mcp' if self.mcp_enabled else 'fixed_percent_mem0'
         }
     
     async def _generate_ai_recommendation(

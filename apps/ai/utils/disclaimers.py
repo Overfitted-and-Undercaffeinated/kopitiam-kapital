@@ -46,12 +46,12 @@ def add_disclaimer_to_recommendation(recommendation: dict) -> dict:
     
     return recommendation
 
-def add_disclaimer_to_brief(brief: dict) -> dict:
-    """Add disclaimer to morning/EOD brief"""
+def add_disclaimer_to_brief(brief_text: str) -> str:
+    """Add disclaimer to morning/EOD brief text"""
     if settings.enable_disclaimers:
-        brief['disclaimer'] = BRIEF_DISCLAIMER
+        return brief_text + "\n\n" + BRIEF_DISCLAIMER
     
-    return brief
+    return brief_text
 
 def add_disclaimer_to_alert(alert: dict) -> dict:
     """Add disclaimer to alert"""
