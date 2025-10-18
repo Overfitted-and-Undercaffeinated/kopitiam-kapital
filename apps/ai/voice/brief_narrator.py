@@ -30,12 +30,13 @@ class BriefNarrator:
     
     def __init__(self):
         self.api_key = settings.elevenlabs_api_key
-        self.voice_id = getattr(settings, 'kopi_colt_voice_id', None)
+        # Default to Adam voice (friendly American male) if not configured
+        self.voice_id = getattr(settings, 'kopi_colt_voice_id', 'pNInz6obpgDQGcFmaJgB')
         self.base_url = "https://api.elevenlabs.io/v1"
         self.enabled = bool(self.api_key)
         
         if self.enabled:
-            logger.info("Initialized ElevenLabs voice narrator")
+            logger.info(f"Initialized ElevenLabs voice narrator (voice ID: {self.voice_id})")
         else:
             logger.warning("ElevenLabs not configured - voice disabled")
     

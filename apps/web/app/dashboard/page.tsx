@@ -76,7 +76,7 @@ export default function DashboardPage() {
           watchlist,
           market: 'US',
           user_id: userId,
-          include_voice: false
+          include_voice: true
         }),
         signal: AbortSignal.timeout(60000) // 60 second timeout
       })
@@ -117,7 +117,7 @@ export default function DashboardPage() {
           watchlist,
           market: 'US',
           user_id: userId,
-          include_voice: false
+          include_voice: true
         }),
         signal: AbortSignal.timeout(60000) // 60 second timeout
       })

@@ -498,6 +498,7 @@ async def test_morning_brief(request: BriefRequest):
         logger.info(f"TEST: Starting morning brief generation for user {request.user_id}")
         
         # Return a simple test response
+        from datetime import datetime
         return {
             "type": "morning",
             "text": f"Test morning brief for {request.user_id} with watchlist {request.watchlist}",

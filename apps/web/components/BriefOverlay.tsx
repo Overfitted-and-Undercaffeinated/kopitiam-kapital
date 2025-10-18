@@ -54,10 +54,32 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
         title: 'Generated Text',
         narration: rawBackendData.text || "No text available",
         content: (
-          <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
-            <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">AI Generated Brief</h3>
-            <div className="text-[#4A3F35] leading-relaxed whitespace-pre-wrap">
-              {rawBackendData.text}
+          <div className="space-y-4">
+            {/* Audio Player */}
+            {rawBackendData.audio_base64 && (
+              <div className="bg-[#8B7355] rounded-lg p-4 border border-[#6F5D47]">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">🎙️</div>
+                  <div className="flex-1">
+                    <h4 className="text-white font-semibold mb-1">🤠 Listen to Kopi Colt</h4>
+                    <audio 
+                      controls 
+                      className="w-full h-10"
+                      src={`data:audio/mp3;base64,${rawBackendData.audio_base64}`}
+                    >
+                      Your browser does not support audio playback.
+                    </audio>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Text Content */}
+            <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
+              <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">AI Generated Brief</h3>
+              <div className="text-[#4A3F35] leading-relaxed whitespace-pre-wrap">
+                {rawBackendData.text}
+              </div>
             </div>
           </div>
         )
