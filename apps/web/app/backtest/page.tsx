@@ -3,6 +3,13 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { getBacktestTemplates, runBacktestDetailed } from '@/lib/api'
+import dynamic from 'next/dynamic'
+
+// Dynamically import the 3D scene to avoid SSR issues
+const BacktestCharacterScene = dynamic(
+  () => import('./components/BacktestCharacterScene'),
+  { ssr: false }
+)
 
 export default function BacktestPage() {
   const [symbol, setSymbol] = useState('')
@@ -76,6 +83,23 @@ export default function BacktestPage() {
 
   const formatPercent = (value: number) => {
     return `${value > 0 ? '+' : ''}${(value * 100).toFixed(2)}%`
+  }
+
+  // Determine if backtest result is good or bad
+  const isGoodResult = () => {
+    if (!results || !results.metrics) return false
+    
+    // Consider it good if:
+    // - Total return is positive
+    // - Win rate > 50%
+    // - Sharpe ratio > 0 (if available)
+    const totalReturn = results.metrics.total_return_pct > 0
+    const goodWinRate = results.metrics.win_rate > 0.5
+    const goodSharpe = !results.metrics.sharpe_ratio || results.metrics.sharpe_ratio > 0
+    
+    // At least 2 of 3 criteria should be met
+    const goodCriteria = [totalReturn, goodWinRate, goodSharpe].filter(Boolean).length
+    return goodCriteria >= 2
   }
 
   return (
@@ -236,6 +260,23 @@ export default function BacktestPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
+                {/* Character Visualization - Kopikolt riding bull or fighting bear */}
+                <div className="bg-white rounded-lg border border-[#E5E5E5] overflow-hidden">
+                  <div className="p-6 border-b border-[#E5E5E5] text-center">
+                    <h3 className="text-xl font-bold text-[#2F1810]">
+                      {isGoodResult() ? '🎉 Yee-Haw! Riding the Bull!' : '⚔️ Battle Mode: Fighting the Bear'}
+                    </h3>
+                    <p className="text-sm text-[#6B5D52] mt-1">
+                      {isGoodResult() 
+                        ? 'This strategy shows strong performance!' 
+                        : 'This strategy needs improvement. Kopikolt is ready to fight back!'}
+                    </p>
+                  </div>
+                  <div className="bg-gradient-to-b from-[#FFF8DC] to-[#FAFAF9]" style={{ height: '450px' }}>
+                    <BacktestCharacterScene isGoodResult={isGoodResult()} />
+                  </div>
+                </div>
+
                 {/* Summary Card */}
                 <div className="bg-gradient-to-br from-[#8B7355] to-[#6F5D47] rounded-lg p-6 border border-[#6F5D47] text-white">
                   <h2 className="text-xl font-bold mb-4">{results.symbol} - {results.strategy}</h2>

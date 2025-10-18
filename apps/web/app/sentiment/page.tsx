@@ -40,6 +40,57 @@ export default function SentimentPage() {
     return 'Neutral 🟡'
   }
 
+  const extractPublisherName = (url: string, title: string) => {
+    if (!url) return title || 'News Source'
+    
+    try {
+      const domain = new URL(url).hostname.toLowerCase()
+      
+      // Map common domains to publisher names
+      const publisherMap: { [key: string]: string } = {
+        'cnbc.com': 'CNBC',
+        'reuters.com': 'Reuters',
+        'bloomberg.com': 'Bloomberg',
+        'wsj.com': 'Wall Street Journal',
+        'ft.com': 'Financial Times',
+        'marketwatch.com': 'MarketWatch',
+        'yahoo.com': 'Yahoo Finance',
+        'investing.com': 'Investing.com',
+        'seekingalpha.com': 'Seeking Alpha',
+        'benzinga.com': 'Benzinga',
+        'fool.com': 'Motley Fool',
+        'nasdaq.com': 'NASDAQ',
+        'finance.yahoo.com': 'Yahoo Finance',
+        'markets.businessinsider.com': 'Business Insider',
+        'businessinsider.com': 'Business Insider',
+        'forbes.com': 'Forbes',
+        'barrons.com': 'Barron\'s',
+        'investor.com': 'Investor.com',
+        'thestreet.com': 'TheStreet',
+        'zacks.com': 'Zacks',
+        'morningstar.com': 'Morningstar'
+      }
+      
+      // Check for exact matches first
+      for (const [domainKey, publisherName] of Object.entries(publisherMap)) {
+        if (domain.includes(domainKey)) {
+          return publisherName
+        }
+      }
+      
+      // Extract from domain if no match
+      const parts = domain.split('.')
+      if (parts.length >= 2) {
+        const mainDomain = parts[parts.length - 2]
+        return mainDomain.charAt(0).toUpperCase() + mainDomain.slice(1)
+      }
+      
+      return title || 'News Source'
+    } catch {
+      return title || 'News Source'
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: 'var(--font-body)' }}>
       {/* Header */}
@@ -217,11 +268,16 @@ export default function SentimentPage() {
                   {sentimentData.top_sources.slice(0, 5).map((source: any, idx: number) => (
                     <div key={idx} className="p-4 hover:bg-[#FAFAF9] transition-colors">
                       <div className="flex items-start gap-3">
-                        <div className={`mt-1 w-2 h-2 rounded-full ${getSentimentColor(source.sentiment || 0.5)}`} />
+                        <div className={`mt-1 w-2 h-2 rounded-full ${getSentimentColor(source.sentiment_score || 0.5)}`} />
                         <div className="flex-1">
                           <h4 className="font-semibold text-[#2F1810] mb-1">
-                            {source.title || source.text?.substring(0, 100)}
+                            {extractPublisherName(source.url, source.title)}
                           </h4>
+                          {source.title && source.title !== extractPublisherName(source.url, source.title) && (
+                            <div className="text-sm text-[#6B5D52] mb-1 italic">
+                              {source.title.length > 80 ? source.title.substring(0, 80) + '...' : source.title}
+                            </div>
+                          )}
                           {source.url && (
                             <a
                               href={source.url}
@@ -232,9 +288,14 @@ export default function SentimentPage() {
                               View Source →
                             </a>
                           )}
-                          {source.author && (
+                          {source.published_date && (
                             <div className="text-sm text-[#6B5D52] mt-1">
-                              by {source.author}
+                              {new Date(source.published_date).toLocaleDateString()}
+                            </div>
+                          )}
+                          {source.sentiment_reasoning && source.sentiment_reasoning !== 'No reasoning available' && (
+                            <div className="text-sm text-[#6B5D52] mt-1 italic">
+                              {source.sentiment_reasoning.substring(0, 150)}...
                             </div>
                           )}
                         </div>

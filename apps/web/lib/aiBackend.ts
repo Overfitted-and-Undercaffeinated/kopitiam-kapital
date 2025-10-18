@@ -118,8 +118,8 @@ function transformBriefResponse(backend: BackendBriefResponse): FrontendBrief {
  */
 export async function getMorningBrief(
   userId: string,
-  watchlist: string[] = ['DBS', 'OCBC', 'UOB'],
-  market: string = 'SGX'
+  watchlist: string[] = ['MSFT', 'AAPL', 'NVDA'],
+  market: string = 'US'
 ): Promise<FrontendBrief> {
   console.log('📡 [aiBackend] Calling getMorningBrief')
   console.log('  API URL:', AI_API)
@@ -172,8 +172,8 @@ export async function getMorningBrief(
  */
 export async function getEODBrief(
   userId: string,
-  watchlist: string[] = ['DBS', 'OCBC', 'UOB'],
-  market: string = 'SGX'
+  watchlist: string[] = ['MSFT', 'AAPL', 'NVDA'],
+  market: string = 'US'
 ): Promise<FrontendBrief> {
   console.log('📡 [aiBackend] Calling getEODBrief')
   console.log('  API URL:', AI_API)

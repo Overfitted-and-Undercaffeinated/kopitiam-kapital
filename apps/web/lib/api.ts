@@ -129,10 +129,25 @@ export async function runBacktestDetailed(params: {
   end_date?: string
   initial_capital?: number
 }) {
-  const response = await fetch(`${API_BASE_URL}/backtest/run`, {
+  // Build query string from parameters
+  const queryParams = new URLSearchParams()
+  queryParams.append('symbol', params.symbol)
+  
+  if (params.strategy_template_id) {
+    queryParams.append('strategy_template_id', params.strategy_template_id)
+  }
+  if (params.start_date) {
+    queryParams.append('start_date', params.start_date)
+  }
+  if (params.end_date) {
+    queryParams.append('end_date', params.end_date)
+  }
+  if (params.initial_capital) {
+    queryParams.append('initial_capital', params.initial_capital.toString())
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/backtest/run?${queryParams.toString()}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
   })
   
   if (!response.ok) {
