@@ -152,6 +152,9 @@ class BacktestEngine:
             # Filter by date range
             data = data.loc[start_date:end_date]
             
+            # ADD: Log data info
+            logger.info(f"Backtesting {symbol}: {len(data)} days of data")
+            
             # Run strategy
             trades = await self._simulate_trades(data, strategy_fn, initial_capital)
             
@@ -181,7 +184,18 @@ class BacktestEngine:
         current_position = None
         capital = initial_capital
         
-        for i in range(20, len(data)):  # Start after indicator warmup
+        # Start after indicator warmup (RSI needs 14 periods)
+        # Always start after at least 20 days to ensure RSI and other indicators are valid
+        start_index = 20
+        
+        if len(data) < start_index:
+            logger.warning(f"Not enough data for backtest: {len(data)} days (need at least {start_index})")
+            logger.info(f"Backtest complete: 0 trades generated (insufficient data)")
+            return []
+        
+        logger.info(f"Starting simulation from index {start_index} of {len(data)} total days")
+        
+        for i in range(start_index, len(data)):
             current_date = data.index[i]
             current_price = data['Close'].iloc[i]
             
@@ -208,6 +222,7 @@ class BacktestEngine:
                     direction=signal.get('direction', 'BUY'),
                     shares=shares
                 )
+                logger.debug(f"Opened position: Entry=${current_price:.2f}, Stop=${current_position.stop:.2f}, Target=${current_position.target:.2f}")
             
             elif current_position:
                 # Check for exit conditions
@@ -219,12 +234,14 @@ class BacktestEngine:
                     current_position.exit_price = current_position.stop
                     current_position.exit_date = current_date
                     current_position.outcome = 'loss'
+                    logger.debug(f"Stop loss hit: ${low:.2f} <= ${current_position.stop:.2f}")
                 
                 # Target hit
                 elif current_position.direction == "BUY" and high >= current_position.target:
                     current_position.exit_price = current_position.target
                     current_position.exit_date = current_date
                     current_position.outcome = 'win'
+                    logger.debug(f"Target hit: ${high:.2f} >= ${current_position.target:.2f}")
                 
                 # Calculate P&L if exited
                 if current_position.exit_price:
@@ -240,8 +257,29 @@ class BacktestEngine:
                     # Update capital with P&L
                     capital += current_position.pnl
                     
+                    logger.info(f"Trade closed: P&L=${current_position.pnl:.2f} ({current_position.pnl_pct:.2%})")
+                    
                     trades.append(current_position)
                     current_position = None
+        
+        # Close any remaining open position at market close
+        if current_position:
+            logger.info(f"Closing open position at end of backtest")
+            final_price = data['Close'].iloc[-1]
+            current_position.exit_price = final_price
+            current_position.exit_date = data.index[-1]
+            current_position.outcome = 'win' if final_price > current_position.entry_price else 'loss'
+            
+            # Calculate P&L
+            pnl_per_share = current_position.exit_price - current_position.entry_price
+            current_position.pnl = pnl_per_share * current_position.shares
+            current_position.pnl_pct = pnl_per_share / current_position.entry_price
+            
+            logger.info(f"Trade closed at market: P&L=${current_position.pnl:.2f} ({current_position.pnl_pct:.2%})")
+            trades.append(current_position)
+        
+        # ADD: Log simulation results
+        logger.info(f"Backtest complete: {len(trades)} trades generated")
         
         return trades
     
@@ -351,16 +389,33 @@ class BacktestEngine:
                 'equity': current_equity,
                 'trade_pnl': 0
             })
-        
-        # Add each trade exit
-        for trade in trades:
-            if trade.exit_date and trade.pnl is not None:
-                current_equity += trade.pnl
-                equity_curve.append({
-                    'date': trade.exit_date.isoformat(),
-                    'equity': current_equity,
-                    'trade_pnl': trade.pnl
-                })
+            
+            # Add each trade exit
+            for trade in trades:
+                if trade.exit_date and trade.pnl is not None:
+                    current_equity += trade.pnl
+                    equity_curve.append({
+                        'date': trade.exit_date.isoformat(),
+                        'equity': current_equity,
+                        'trade_pnl': trade.pnl
+                    })
+        else:
+            # No trades - create flat line at initial capital
+            # Use current date for two points to show flat line
+            from datetime import datetime
+            today = datetime.now().isoformat()
+            equity_curve = [
+                {
+                    'date': today,
+                    'equity': initial_capital,
+                    'trade_pnl': 0
+                },
+                {
+                    'date': today,
+                    'equity': initial_capital,
+                    'trade_pnl': 0
+                }
+            ]
         
         return equity_curve
     

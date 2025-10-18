@@ -9,12 +9,12 @@ from datetime import datetime
 # Flexible imports
 try:
     from ..utils.tier_manager import tier_manager, Feature, UserTier
-    from ..utils.clients import get_openai_client
+    from ..utils.clients import get_groq_client
     from ..memory.mem0_service import mem0_service
     from ..utils.cost_tracker import cost_tracker
 except ImportError:
     from utils.tier_manager import tier_manager, Feature, UserTier
-    from utils.clients import get_openai_client
+    from utils.clients import get_groq_client
     from memory.mem0_service import mem0_service
     from utils.cost_tracker import cost_tracker
 
@@ -75,8 +75,8 @@ class ExplainerAgent:
     
     def __init__(self):
         self.name = "explainer"
-        self.client = get_openai_client()
-        self.model = "gpt-4o-mini"
+        self.client = get_groq_client()
+        self.model = "llama-3.3-70b-versatile"
         logger.info("Initialized Explainer Agent")
     
     async def explain(
@@ -253,7 +253,7 @@ IMPORTANT: Use HTML formatting:
             user_prompt += "\n\nProvide advanced analysis, edge cases, and professional strategies."
         
         try:
-            response = await self.client.chat.completions.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},

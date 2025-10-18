@@ -1,76 +1,74 @@
-"""Debug backtest to see why so few trades"""
+#!/usr/bin/env python3
+"""
+Test script to debug backtest simulation loop
+"""
 import asyncio
-import logging
+import sys
+import os
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+# Add the current directory to Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-async def main():
-    from backtesting.engine import BacktestEngine
-    from backtesting.templates import get_template
-    from backtesting.builder import strategy_builder
-    from datetime import datetime, timedelta
-    
-    print("\n" + "="*80)
-    print("BACKTEST DEBUG TEST")
-    print("="*80)
-    
-    # Get RSI oversold strategy
-    strategy_def = get_template('rsi_oversold')
-    print(f"\nStrategy: {strategy_def['name']}")
-    print(f"Description: {strategy_def.get('description', 'N/A')}")
-    print(f"Entry rules: {strategy_def['entry_rules']}")
-    print(f"Exit rules: {strategy_def['exit_rules']}")
-    print(f"Risk management: {strategy_def['risk_management']}")
-    
-    # Build strategy
-    strategy_func = strategy_builder.build_strategy(strategy_def)
-    
-    # Test with different time periods
-    symbols = ['NVDA', 'AAPL', 'MSFT']
-    
-    for symbol in symbols:
-        print(f"\n" + "-"*80)
-        print(f"Testing {symbol}")
-        print("-"*80)
+async def test_backtest_debug():
+    """Debug the backtest simulation loop"""
+    try:
+        from agents.strategy_translator import strategy_translator
+        from backtesting.builder import strategy_builder
+        from backtesting.engine import BacktestEngine
         
-        # Test 1 year
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)
+        print("Debugging backtest simulation loop...")
         
-        engine = BacktestEngine()
-        results = await engine.run_backtest(
-            symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d'),
-            strategy_fn=strategy_func,
-            initial_capital=100000
+        # Get strategy definition
+        strategy_def = await strategy_translator.translate_strategy(
+            natural_language="mean reversion",
+            symbol="AAPL"
         )
         
-        print(f"1-Year Backtest:")
-        print(f"  Trades:      {results['num_trades']}")
-        print(f"  Win Rate:    {results['win_rate']:.1%}")
-        print(f"  Total Return: {results['total_return_pct']:.1%}")
-        print(f"  Sharpe:      {results['sharpe_ratio']:.2f}")
+        print(f"Strategy: {strategy_def['name']}")
         
-        # Test 2 years for comparison
-        start_date_2y = end_date - timedelta(days=730)
+        # Build strategy function
+        strategy_func = await strategy_builder.build_strategy(strategy_def)
+        print("✅ Strategy function built")
         
-        results_2y = await engine.run_backtest(
-            symbol=symbol,
-            start_date=start_date_2y.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d'),
-            strategy_fn=strategy_func,
-            initial_capital=100000
-        )
+        # Test the strategy function directly with a small dataset
+        print("\nTesting strategy function directly...")
         
-        print(f"\n2-Year Backtest:")
-        print(f"  Trades:      {results_2y['num_trades']}")
-        print(f"  Win Rate:    {results_2y['win_rate']:.1%}")
-        print(f"  Total Return: {results_2y['total_return_pct']:.1%}")
-        print(f"  Sharpe:      {results_2y['sharpe_ratio']:.2f}")
-    
-    print("\n" + "="*80)
+        # Import market data service to get real AAPL data
+        try:
+            from data.market_data import market_data_service
+            
+            # Get a small amount of AAPL data
+            data = await market_data_service.get_ohlcv(
+                symbol="AAPL",
+                period="max"
+            )
+            
+            if data is None or data.empty:
+                print("❌ No data available for AAPL")
+                return
+                
+            # Filter to last 30 days for testing
+            data = data.tail(30)
+            print(f"Using {len(data)} days of AAPL data")
+            print(f"Date range: {data.index[0]} to {data.index[-1]}")
+            
+            # Test the strategy function on this data
+            signal = await strategy_func(data)
+            print(f"Strategy signal: {signal}")
+            
+            if signal:
+                print("✅ Strategy generated a signal!")
+            else:
+                print("❌ Strategy did not generate a signal")
+                
+        except Exception as e:
+            print(f"Error getting market data: {e}")
+            return
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
+    asyncio.run(test_backtest_debug())

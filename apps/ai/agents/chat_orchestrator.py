@@ -12,7 +12,7 @@ from openai import OpenAI
 
 # Flexible imports
 try:
-    from ..utils.clients import get_openai_client
+    from ..utils.clients import get_groq_client
     from ..agents.recommend import recommendation_agent
     from ..agents.explainer import ExplainerAgent
     from ..sentiment.aggregator import sentiment_aggregator
@@ -21,7 +21,7 @@ try:
     from ..agents.strategy_translator import strategy_translator
     from ..agents.backtest_explainer import backtest_explainer
 except ImportError:
-    from utils.clients import get_openai_client
+    from utils.clients import get_groq_client
     from agents.recommend import recommendation_agent
     from agents.explainer import ExplainerAgent
     from sentiment.aggregator import sentiment_aggregator
@@ -149,8 +149,8 @@ class ChatOrchestratorAgent:
     
     def __init__(self):
         self.name = "chat_orchestrator"
-        self.client = get_openai_client()
-        self.model = "gpt-4o-mini"  # Fast and cost-effective
+        self.client = get_groq_client()
+        self.model = "llama-3.3-70b-versatile"  # Fast and cost-effective
         self.backtest_engine = BacktestEngine()
         self.explainer = ExplainerAgent()
         logger.info("Initialized Chat Orchestrator Agent")
@@ -224,8 +224,8 @@ class ChatOrchestratorAgent:
     async def _analyze_message(self, message: str) -> Dict:
         """Use GPT-4 to analyze user message and extract intent/entities"""
         try:
-            # Using AsyncOpenAI client, so we need to await
-            response = await self.client.chat.completions.create(
+            # Using Groq client (OpenAI-compatible)
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": CHAT_ORCHESTRATOR_SYSTEM_PROMPT},
@@ -243,7 +243,8 @@ class ChatOrchestratorAgent:
             return analysis
         
         except Exception as e:
-            logger.error(f"Message analysis failed: {e}")
+            logger.error(f"Message analysis failed: {e}", exc_info=True)
+            logger.error(f"Error type: {type(e).__name__}, Details: {str(e)}")
             # Fallback to simple keyword matching
             return self._fallback_analysis(message)
     
@@ -325,13 +326,71 @@ class ChatOrchestratorAgent:
                 elif "moving" in words and "average" in words:
                     strategy_description = "moving average strategy"
         
+        # Extract topic for explain intent
+        topic = None
+        if intent == "EXPLAIN":
+            # Common trading terms to recognize
+            trading_terms = [
+                "rsi", "macd", "bollinger bands", "moving average", "vwap", "support", "resistance",
+                "candlestick patterns", "volume", "volatility", "sharpe ratio", "mean reversion", 
+                "momentum", "trend following", "backtesting", "pivot points", "fibonacci", "stochastic",
+                "williams %r", "cci", "atr", "adx", "parabolic sar", "ichimoku", "keltner channels"
+            ]
+            
+            # Pattern 1: "what is X" or "what's X"
+            import re
+            what_pattern = r'what\s+(?:is|s)\s+(.+?)(?:\?|$)'
+            match = re.search(what_pattern, message_lower)
+            if match:
+                potential_topic = match.group(1).strip()
+                # Check if it's a known trading term
+                for term in trading_terms:
+                    if term in potential_topic or potential_topic in term:
+                        topic = term
+                        break
+                if not topic:
+                    topic = potential_topic
+            
+            # Pattern 2: "explain X" or "tell me about X"
+            if not topic:
+                explain_pattern = r'(?:explain|tell me about|teach me about)\s+(.+?)(?:\?|$)'
+                match = re.search(explain_pattern, message_lower)
+                if match:
+                    potential_topic = match.group(1).strip()
+                    for term in trading_terms:
+                        if term in potential_topic or potential_topic in term:
+                            topic = term
+                            break
+                    if not topic:
+                        topic = potential_topic
+            
+            # Pattern 3: "how does X work"
+            if not topic:
+                how_pattern = r'how does\s+(.+?)\s+work'
+                match = re.search(how_pattern, message_lower)
+                if match:
+                    potential_topic = match.group(1).strip()
+                    for term in trading_terms:
+                        if term in potential_topic or potential_topic in term:
+                            topic = term
+                            break
+                    if not topic:
+                        topic = potential_topic
+            
+            # Fallback: check if any trading term is mentioned in the message
+            if not topic:
+                for term in trading_terms:
+                    if term in message_lower:
+                        topic = term
+                        break
+        
         return {
             'intent': intent,
             'symbols': symbols,
             'strategy_description': strategy_description,
-            'topic': None,
+            'topic': topic,
             'confidence': 0.6,  # Higher confidence since we're being more specific
-            'reasoning': 'Fallback analysis with improved symbol and strategy extraction'
+            'reasoning': 'Fallback analysis with improved symbol, strategy, and topic extraction'
         }
     
     async def _handle_backtest(
@@ -376,6 +435,12 @@ class ChatOrchestratorAgent:
                 natural_language=strategy_description,
                 symbol=symbols[0]  # Use first symbol as reference
             )
+            
+            # ADD: Log the generated strategy for debugging
+            logger.info(f"Generated strategy JSON: {json.dumps(strategy_def, indent=2)}")
+            logger.info(f"Strategy name: {strategy_def.get('name')}")
+            logger.info(f"Entry rules: {strategy_def.get('entry_rules')}")
+            logger.info(f"Exit rules: {strategy_def.get('exit_rules')}")
             
             # Build strategy function
             strategy_func = await strategy_builder.build_strategy(strategy_def)

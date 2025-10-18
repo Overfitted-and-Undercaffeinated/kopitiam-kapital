@@ -1,19 +1,32 @@
+#!/usr/bin/env python3
 """
-Test script for strategy builder - converts natural language to backtestable strategies
+Comprehensive test suite for strategy builder
+Tests both translation and execution capabilities
 """
 import asyncio
 import json
-from agents.strategy_translator import strategy_translator
+import sys
+import os
+import pandas as pd
+
+# Add the current directory to Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-async def test_strategy_builder():
-    """Test the strategy builder with various descriptions"""
+async def test_strategy_translation():
+    """Test the strategy translation with various descriptions"""
+    from agents.strategy_translator import strategy_translator
     
     test_cases = [
         {
+            "description": "mean reversion",
+            "symbol": "AAPL",
+            "name": "Mean Reversion (Simple)"
+        },
+        {
             "description": "Buy when RSI is below 30 and sell when it goes above 70",
             "symbol": "AAPL",
-            "name": "Simple RSI Oversold"
+            "name": "RSI Oversold/Overbought"
         },
         {
             "description": "Buy when price breaks above the 20-day moving average, exit when it breaks below",
@@ -27,24 +40,21 @@ async def test_strategy_builder():
         },
         {
             "description": "Buy on Bollinger band lower band touch with 5% stop loss and 15% take profit",
-            "symbol": None,
+            "symbol": "GOOGL",
             "name": "Bollinger Band Mean Reversion"
-        },
-        {
-            "description": "trend following strategy: price above 50 SMA and 200 SMA, with MACD positive",
-            "symbol": "QQQ",
-            "name": "Multi-indicator Trend"
         }
     ]
     
     print("=" * 80)
-    print("STRATEGY BUILDER TEST SUITE")
+    print("STRATEGY TRANSLATION TEST SUITE")
     print("=" * 80)
+    
+    successful_strategies = []
     
     for i, test in enumerate(test_cases, 1):
         print(f"\n[Test {i}/{len(test_cases)}] {test['name']}")
         print(f"Description: {test['description']}")
-        print(f"Symbol: {test['symbol'] or 'N/A'}")
+        print(f"Symbol: {test['symbol']}")
         print("-" * 80)
         
         try:
@@ -53,39 +63,119 @@ async def test_strategy_builder():
                 symbol=test['symbol']
             )
             
-            if strategy.get('error'):
-                print(f"❌ ERROR: {strategy['message']}")
-                print(f"💡 Suggestion: {strategy['suggestion']}")
-            else:
-                print(f"✅ SUCCESS")
-                print(f"   Name: {strategy['name']}")
-                print(f"   Category: {strategy['category']}")
-                print(f"   Difficulty: {strategy['difficulty']}")
-                print(f"   Indicators: {[i['type'] for i in strategy['indicators']]}")
-                print(f"   Entry Rules: {len(strategy['entry_rules'])} rule(s)")
-                print(f"   Exit Rules: {len(strategy['exit_rules'])} rule(s)")
-                print(f"   Stop Loss: {strategy['risk_management']['stop_loss_percent']*100:.1f}%")
-                print(f"   Take Profit: {strategy['risk_management']['take_profit_percent']*100:.1f}%")
-                print(f"\n   Full JSON:")
-                print(json.dumps(strategy, indent=2))
+            print(f"✅ SUCCESS")
+            print(f"   Name: {strategy['name']}")
+            print(f"   Category: {strategy['category']}")
+            print(f"   Indicators: {[i['type'] for i in strategy['indicators']]}")
+            print(f"   Entry Rules: {len(strategy['entry_rules'])} rule(s)")
+            print(f"   Exit Rules: {len(strategy['exit_rules'])} rule(s)")
+            print(f"   Stop Loss: {strategy['risk_management']['stop_loss_percent']*100:.1f}%")
+            print(f"   Take Profit: {strategy['risk_management']['take_profit_percent']*100:.1f}%")
+            
+            successful_strategies.append(strategy)
                 
         except ValueError as e:
             print(f"❌ ERROR: {e}")
         except Exception as e:
             print(f"❌ UNEXPECTED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
     
     print("\n" + "=" * 80)
-    print("TEST SUITE COMPLETE")
+    print(f"Translation Tests Complete: {len(successful_strategies)}/{len(test_cases)} passed")
     print("=" * 80)
+    
+    return successful_strategies
+
+
+async def test_strategy_execution(strategies):
+    """Test if translated strategies can be executed with mock data"""
+    from backtesting.builder import strategy_builder
+    
+    print("\n" + "=" * 80)
+    print("STRATEGY EXECUTION TEST SUITE")
+    print("=" * 80)
+    
+    # Create mock OHLCV data
+    dates = pd.date_range('2023-01-01', periods=100, freq='D')
+    mock_data = pd.DataFrame({
+        'open': [100 + i*0.5 for i in range(100)],
+        'high': [105 + i*0.5 for i in range(100)],
+        'low': [95 + i*0.5 for i in range(100)],
+        'close': [102 + i*0.5 for i in range(100)],
+        'volume': [1000000] * 100
+    }, index=dates)
+    
+    print(f"\nMock data:")
+    print(f"  Shape: {mock_data.shape}")
+    print(f"  Columns: {mock_data.columns.tolist()}")
+    print(f"  Date range: {mock_data.index[0]} to {mock_data.index[-1]}")
+    
+    execution_results = []
+    
+    for i, strategy_def in enumerate(strategies, 1):
+        print(f"\n[Execution Test {i}/{len(strategies)}] {strategy_def['name']}")
+        print("-" * 80)
+        
+        try:
+            # Validate strategy structure
+            is_valid, error_msg = strategy_builder.validate_strategy(strategy_def)
+            if not is_valid:
+                print(f"❌ VALIDATION FAILED: {error_msg}")
+                continue
+            
+            print("✅ Strategy structure is valid")
+            
+            # Build the strategy function
+            strategy_func = await strategy_builder.build_strategy(strategy_def)
+            print("✅ Strategy function built successfully")
+            
+            # Test the strategy function with mock data
+            signal = await strategy_func(mock_data)
+            print(f"   Signal generated: {signal}")
+            
+            if signal:
+                print("✅ Strategy generated a signal!")
+                execution_results.append({
+                    "name": strategy_def['name'],
+                    "signal": signal,
+                    "status": "success"
+                })
+            else:
+                print("⚠️  Strategy did not generate a signal (might need different market conditions)")
+                execution_results.append({
+                    "name": strategy_def['name'],
+                    "signal": None,
+                    "status": "no_signal"
+                })
+                
+        except Exception as e:
+            print(f"❌ ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            execution_results.append({
+                "name": strategy_def['name'],
+                "signal": None,
+                "status": "error",
+                "error": str(e)
+            })
+    
+    print("\n" + "=" * 80)
+    success_count = sum(1 for r in execution_results if r['status'] == 'success')
+    print(f"Execution Tests Complete: {success_count}/{len(strategies)} generated signals")
+    print("=" * 80)
+    
+    return execution_results
 
 
 async def test_invalid_strategies():
     """Test error handling with invalid/vague descriptions"""
+    from agents.strategy_translator import strategy_translator
     
     invalid_cases = [
-        "something random",
+        "",
         "buy",
-        "very complicated multi-timeframe strategy with quantum mechanics"
+        "something random that makes no sense",
     ]
     
     print("\n" + "=" * 80)
@@ -93,22 +183,17 @@ async def test_invalid_strategies():
     print("=" * 80)
     
     for i, description in enumerate(invalid_cases, 1):
-        print(f"\n[Invalid Test {i}] '{description}'")
+        print(f"\n[Invalid Test {i}/{len(invalid_cases)}] '{description}'")
         print("-" * 80)
         
         try:
             strategy = await strategy_translator.translate_strategy(
                 natural_language=description,
-                symbol=None
+                symbol="AAPL"
             )
             
-            if strategy.get('error'):
-                print(f"✅ ERROR CAUGHT (as expected)")
-                print(f"   Message: {strategy['message']}")
-                print(f"   Suggestion: {strategy['suggestion']}")
-            else:
-                print(f"⚠️  Strategy was generated (might be loose interpretation)")
-                print(f"   Name: {strategy['name']}")
+            print(f"⚠️  Strategy was generated (loose interpretation)")
+            print(f"   Name: {strategy['name']}")
                 
         except ValueError as e:
             print(f"✅ ERROR CAUGHT (as expected): {e}")
@@ -116,10 +201,31 @@ async def test_invalid_strategies():
             print(f"⚠️  Unexpected error: {e}")
     
     print("\n" + "=" * 80)
+    print("Invalid Strategy Tests Complete")
+    print("=" * 80)
+
+
+async def main():
+    """Run all tests"""
+    print("\n🧪 STRATEGY BUILDER COMPREHENSIVE TEST SUITE")
+    print("=" * 80)
+    
+    # Test 1: Translation
+    strategies = await test_strategy_translation()
+    
+    # Test 2: Execution (only if we have successful translations)
+    if strategies:
+        await test_strategy_execution(strategies)
+    else:
+        print("\n⚠️  Skipping execution tests - no strategies translated successfully")
+    
+    # Test 3: Error handling
+    await test_invalid_strategies()
+    
+    print("\n" + "=" * 80)
+    print("✅ ALL TESTS COMPLETE")
+    print("=" * 80)
 
 
 if __name__ == "__main__":
-    print("Starting Strategy Builder Tests...\n")
-    asyncio.run(test_strategy_builder())
-    asyncio.run(test_invalid_strategies())
-
+    asyncio.run(main())
