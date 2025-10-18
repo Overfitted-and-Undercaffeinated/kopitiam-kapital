@@ -89,6 +89,12 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete }: 
       })
 
       if (!response.ok) {
+        // Timeout (408) or other errors - skip voice and continue
+        if (response.status === 408) {
+          console.warn('Voice generation timed out, continuing without audio')
+        } else {
+          console.warn('Voice generation failed, continuing without audio')
+        }
         setIsPlayingAudio(false)
         return
       }

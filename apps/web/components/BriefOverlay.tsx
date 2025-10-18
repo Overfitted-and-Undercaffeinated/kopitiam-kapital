@@ -46,6 +46,25 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
   const [isClosing, setIsClosing] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  const handleClose = () => {
+    // Stop audio immediately when closing
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current = null
+    }
+    setIsPlayingAudio(false)
+    
+    // Trigger Kopi's exit animation
+    setIsClosing(true)
+    
+    // Wait for animation to complete before actually closing
+    setTimeout(() => {
+      setIsClosing(false)
+      onClose()
+    }, 1200) // Animation duration
+  }
+
   // Auto-play audio when overlay opens (hidden audio element)
   useEffect(() => {
     if (isOpen && rawBackendData?.audio_base64) {
@@ -379,6 +398,12 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
       })
 
       if (!response.ok) {
+        // Timeout (408) or other errors - skip voice and continue
+        if (response.status === 408) {
+          console.warn('Voice generation timed out, continuing without audio')
+        } else {
+          console.warn('Voice generation failed, continuing without audio')
+        }
         setIsPlayingAudio(false)
         return
       }
@@ -419,25 +444,6 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
     } else {
       onClose()
     }
-  }
-
-  const handleClose = () => {
-    // Stop audio immediately when closing
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      audioRef.current = null
-    }
-    setIsPlayingAudio(false)
-    
-    // Trigger Kopi's exit animation
-    setIsClosing(true)
-    
-    // Wait for animation to complete before actually closing
-    setTimeout(() => {
-      setIsClosing(false)
-      onClose()
-    }, 1200) // Animation duration
   }
 
   const getKopiExpression = () => {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-server'
+import { supabaseAdmin, isSupabaseConfigured } from '@/lib/supabase-server'
 
 export async function POST(request: Request) {
   try {
@@ -19,6 +19,18 @@ export async function POST(request: Request) {
     } = body
 
     console.log('📝 Creating user with Supabase:', { name, email, riskProfile })
+
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      console.error('❌ Supabase not configured - missing SUPABASE_SERVICE_KEY')
+      return NextResponse.json(
+        { 
+          error: 'Service unavailable', 
+          message: 'Database service is not configured. Please contact support.' 
+        },
+        { status: 503 }
+      )
+    }
 
     // Validate required fields
     if (!name || !email || !password || !riskProfile) {

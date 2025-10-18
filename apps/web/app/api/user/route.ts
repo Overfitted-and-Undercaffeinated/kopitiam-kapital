@@ -42,8 +42,8 @@ export async function GET(request: Request) {
         positions(
           id,
           instrument_id,
-          quantity,
-          average_price,
+          qty,
+          avg_price,
           opened_at,
           instrument:instruments(
             symbol,
