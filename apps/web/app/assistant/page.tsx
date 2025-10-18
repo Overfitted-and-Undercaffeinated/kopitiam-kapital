@@ -9,6 +9,10 @@ const KopiColt2D = dynamic(() => import('../onboarding/components/KopiColt2D'), 
   ssr: false,
 })
 
+const BacktestCharacterScene = dynamic(() => import('../backtest/components/BacktestCharacterScene'), {
+  ssr: false,
+})
+
 interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -436,8 +440,33 @@ export default function AssistantPage() {
                             console.log('📊 Chart data:', chartData)
                             console.log('📊 Backtest result:', backtestResult)
                             
+                            // Determine if result is good or bad
+                            const totalReturn = backtestResult.total_return_pct > 0
+                            const goodWinRate = backtestResult.win_rate > 0.5
+                            const goodSharpe = !backtestResult.sharpe_ratio || backtestResult.sharpe_ratio > 0
+                            const goodCriteria = [totalReturn, goodWinRate, goodSharpe].filter(Boolean).length
+                            const isGoodResult = goodCriteria >= 2
+                            
                             return (
-                              <div key={index} className="mb-6">
+                              <div key={index} className="mb-6 space-y-4">
+                                {/* Character Visualization */}
+                                <div className="bg-white rounded-lg border border-[#E5E5E5] overflow-hidden">
+                                  <div className="p-4 border-b border-[#E5E5E5] text-center">
+                                    <h4 className="text-lg font-bold text-[#2F1810]">
+                                      {isGoodResult ? '🎉 Yee-Haw! Riding the Bull!' : '⚔️ Battle Mode: Fighting the Bear'}
+                                    </h4>
+                                    <p className="text-xs text-[#6B5D52] mt-1">
+                                      {isGoodResult 
+                                        ? 'This strategy shows strong performance!' 
+                                        : 'This strategy needs improvement. Kopikolt is ready to fight back!'}
+                                    </p>
+                                  </div>
+                                  <div className="bg-gradient-to-b from-[#FFF8DC] to-[#FAFAF9]" style={{ height: '350px' }}>
+                                    <BacktestCharacterScene isGoodResult={isGoodResult} />
+                                  </div>
+                                </div>
+                                
+                                {/* Backtest Chart */}
                                 <BacktestChart
                                   symbol={chartData.symbol}
                                   strategyName={message.metadata.strategy_name || 'Trading Strategy'}
