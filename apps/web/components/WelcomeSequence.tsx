@@ -254,7 +254,7 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete, on
                 transition={{ duration: 0.6 }}
               >
                 <KopiColt2D
-                  key={`kopi-${stage}`}
+                  key="kopi-welcome"
                   expression={kopiExpression}
                   step={0}
                   isIntro={true}
