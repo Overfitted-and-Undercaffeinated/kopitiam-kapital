@@ -1,0 +1,27 @@
+{
+  "name": "kopitiam-capital",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "mcp/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "db:migrate": "cd supabase && supabase db push",
+    "ai:dev": "cd apps/ai && uvicorn main:app --reload",
+    "web:dev": "cd apps/web && npm run dev",
+    "mobile:dev": "cd apps/mobile && npm start"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "turbo": "^1.10.0",
+    "typescript": "^5.0.0"
+  }
+}
+

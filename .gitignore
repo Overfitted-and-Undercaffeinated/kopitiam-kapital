@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+.env.local
+*.log
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+.expo/
+.turbo/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# MCP
+mcp/**/*.js
+mcp/**/node_modules/
+
+# Test coverage
+.coverage
+coverage/
+htmlcov/
+
+# Data
+/data/
+*.db
+*.sqlite
+
