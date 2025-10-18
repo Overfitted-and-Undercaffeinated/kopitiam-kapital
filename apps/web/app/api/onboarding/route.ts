@@ -45,12 +45,17 @@ export async function POST(request: Request) {
     }
 
     // Create user
+    // Map values to match database constraints
+    const formatRiskProfile = (profile: string) => {
+      return profile.charAt(0).toUpperCase() + profile.slice(1).toLowerCase()
+    }
+
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .insert({
         email,
         name,
-        risk_profile: riskProfile.toUpperCase(),
+        risk_profile: formatRiskProfile(riskProfile), // 'moderate' -> 'Moderate'
         explanation_level: experienceLevel?.toLowerCase() || 'intermediate',
         trading_capital_range: tradingCapital,
         primary_markets: primaryMarkets || [],

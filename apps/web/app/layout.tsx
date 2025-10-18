@@ -1,18 +1,20 @@
 import type { Metadata } from 'next'
-import { Inter, Bowlby_One_SC } from 'next/font/google'
+import { Sen } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 
-const inter = Inter({ 
+const sen = Sen({ 
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800', '900'],
+  weight: ['400', '500', '600', '700', '800'],
   display: 'swap',
+  variable: '--font-body',
 })
 
-const bowlbyOne = Bowlby_One_SC({
-  weight: '400',
-  subsets: ['latin'],
+const bbhSansBogle = localFont({
+  src: '../public/fonts/BBH_Sans_Bogle/BBHSansBogle-Regular.ttf',
+  variable: '--font-heading',
   display: 'swap',
-  variable: '--font-bowlby',
+  weight: '700',
 })
 
 export const metadata: Metadata = {
@@ -26,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={bowlbyOne.variable}>
-      <body className={inter.className}>{children}</body>
+    <html lang="en" className={`${bbhSansBogle.variable} ${sen.variable}`}>
+      <body className={sen.className}>{children}</body>
     </html>
   )
 }

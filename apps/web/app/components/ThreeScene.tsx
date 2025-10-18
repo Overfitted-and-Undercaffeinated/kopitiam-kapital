@@ -659,11 +659,12 @@ export default function ThreeScene() {
         cactus.rotation.z = Math.sin(Date.now() * 0.001 + index) * 0.05
       })
 
-      // Animate clouds
+      // Animate clouds - let them go completely off screen before resetting
       clouds.forEach(cloud => {
         cloud.mesh.position.x += cloud.speed
-        if (cloud.mesh.position.x > 25) {
-          cloud.mesh.position.x = -25
+        // Cloud width is about 6 units (scale 2), so wait until completely off screen
+        if (cloud.mesh.position.x > 30) {
+          cloud.mesh.position.x = -30
         }
       })
 
@@ -672,8 +673,9 @@ export default function ThreeScene() {
         tumbleweed.mesh.position.x += tumbleweed.speed
         tumbleweed.mesh.rotation.z -= tumbleweed.rotSpeed // Negative rotation for correct rolling direction
         
-        if (tumbleweed.mesh.position.x > 25) {
-          tumbleweed.mesh.position.x = -25
+        // Let tumbleweeds go completely off screen before resetting
+        if (tumbleweed.mesh.position.x > 30) {
+          tumbleweed.mesh.position.x = -30
           tumbleweed.mesh.position.z = -2 - Math.random() * 3
         }
       })

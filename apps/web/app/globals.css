@@ -7,6 +7,10 @@
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --border: 214.3 31.8% 91.4%;
+    
+    /* Centralized font variables */
+    --font-heading: 'BBH Sans Bogle', system-ui, sans-serif;
+    --font-body: 'Sen', system-ui, sans-serif;
   }
 
   .dark {
@@ -22,6 +26,79 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
   }
+  
+  /* Apply heading font to all heading elements */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+  }
+}
+
+/* BBH Sans Bogle font utility classes */
+.bbh-sans-bogle-regular {
+  font-family: "BBH Sans Bogle", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.bbh-sans-bogle-medium {
+  font-family: "BBH Sans Bogle", sans-serif;
+  font-weight: 500;
+  font-style: normal;
+}
+
+.bbh-sans-bogle-bold {
+  font-family: "BBH Sans Bogle", sans-serif;
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* Western-themed time picker styling */
+.time-picker-western::-webkit-calendar-picker-indicator {
+  filter: invert(45%) sepia(18%) saturate(1234%) hue-rotate(358deg) brightness(94%) contrast(87%);
+  cursor: pointer;
+  font-size: 20px;
+  padding: 4px;
+}
+
+.time-picker-western::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+.time-picker-western::-webkit-datetime-edit {
+  padding: 0;
+}
+
+.time-picker-western::-webkit-datetime-edit-text {
+  color: #8B4513;
+  padding: 0 4px;
+}
+
+.time-picker-western::-webkit-datetime-edit-hour-field,
+.time-picker-western::-webkit-datetime-edit-minute-field,
+.time-picker-western::-webkit-datetime-edit-ampm-field {
+  background: #FFF8DC;
+  color: #2F1810;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  border: 2px solid #CD853F;
+  margin: 0 4px;
+}
+
+.time-picker-western::-webkit-datetime-edit-hour-field:focus,
+.time-picker-western::-webkit-datetime-edit-minute-field:focus,
+.time-picker-western::-webkit-datetime-edit-ampm-field:focus {
+  background: linear-gradient(to bottom right, #CD853F, #8B4513);
+  color: white;
+  outline: none;
+  border-color: #8B4513;
+}
+
+/* Style the dropdown list (if browser supports) */
+.time-picker-western::-webkit-list-button {
+  color: #8B4513;
 }
 
