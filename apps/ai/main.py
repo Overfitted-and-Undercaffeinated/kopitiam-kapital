@@ -650,6 +650,96 @@ async def get_strategy_template(template_id: str):
         logger.error(f"Error getting template: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/strategy/build")
+async def build_strategy_from_description(
+    description: str,
+    symbol: str = None
+):
+    """
+    Build a backtestable strategy from natural language description
+    
+    Uses Groq LLM to interpret the strategy description and generate JSON rules.
+    This endpoint is ideal for chat UI integration - users describe strategies
+    in plain English and get back executable strategy JSON.
+    
+    Args:
+        description: Natural language strategy description
+            Examples:
+            - "Buy when RSI is below 30"
+            - "Buy when price breaks above 20-day moving average"
+            - "MACD crossover strategy"
+            - "Buy on Bollinger band breakout"
+        symbol: Optional stock ticker for context
+    
+    Returns:
+        Strategy JSON object:
+        {
+            "name": "Strategy Name",
+            "description": "What it does",
+            "category": "Trend Following|Mean Reversion|Momentum|Breakout|Other",
+            "difficulty": "Beginner|Intermediate|Advanced",
+            "indicators": [...],
+            "entry_rules": [...],
+            "exit_rules": [...],
+            "position_sizing": {...},
+            "risk_management": {...}
+        }
+        
+    Error Response:
+        {
+            "detail": "Error message with suggestion for refinement"
+        }
+    
+    Examples:
+        POST /strategy/build
+        {
+            "description": "Buy when RSI drops below 30 and sell when it goes above 70",
+            "symbol": "AAPL"
+        }
+        
+        POST /strategy/build
+        {
+            "description": "trend following: buy on MACD bullish crossover, exit on bearish crossover"
+        }
+    """
+    try:
+        if not description or not description.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Strategy description cannot be empty. Please describe a trading strategy."
+            )
+        
+        from agents.strategy_translator import strategy_translator
+        
+        logger.info(f"Building strategy: {description[:80]}... (symbol: {symbol})")
+        
+        # Translate natural language to strategy JSON
+        strategy_dict = await strategy_translator.translate_strategy(
+            natural_language=description,
+            symbol=symbol
+        )
+        
+        logger.info(f"Strategy built successfully: '{strategy_dict['name']}'")
+        
+        return {
+            "success": True,
+            "strategy": strategy_dict,
+            "message": f"Strategy '{strategy_dict['name']}' built successfully and ready to backtest!"
+        }
+        
+    except ValueError as e:
+        logger.warning(f"Strategy build validation error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not build strategy: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error building strategy: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to build strategy: {str(e)}"
+        )
+
 @app.post("/backtest/run")
 async def run_backtest(
     symbol: str,
@@ -860,6 +950,208 @@ async def run_backtest(
     except Exception as e:
         logger.error(f"Backtest error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Backtest failed: {str(e)}")
+
+@app.post("/backtest/run-from-description")
+async def run_backtest_from_description(
+    strategy_description: str,
+    symbol: str,
+    start_date: str = None,
+    end_date: str = None,
+    initial_capital: float = 100000,
+    user_id: str = None
+):
+    """
+    Complete workflow: Natural language strategy → Backtest → Results + Charts + Explanation
+    
+    **Workflow**:
+    1. Convert natural language to trading rules
+    2. Run backtest with those rules
+    3. Generate explanation of results
+    4. Return comprehensive JSON with metrics, charts, and narrative
+    
+    **Latency target**: 15-20s (includes strategy translation + backtesting + analysis)
+    
+    Args:
+        strategy_description: Natural language strategy description
+            Examples:
+            - "Buy when RSI is below 30"
+            - "Buy when price breaks above 20-day moving average"
+            - "MACD crossover strategy"
+        symbol: Stock ticker
+        start_date: Start date (YYYY-MM-DD, optional, defaults to 2 years ago)
+        end_date: End date (YYYY-MM-DD, optional, defaults to today)
+        initial_capital: Starting capital (default: $100,000)
+        user_id: User ID for tracking (optional)
+    
+    Returns:
+        Comprehensive backtest result with metrics, charts, and explanation:
+        {
+            "strategy": {
+                "name": "RSI Oversold",
+                "description": "Buy when RSI below 30",
+                "category": "Mean Reversion",
+                ...
+            },
+            "metrics": {
+                "total_return_pct": 0.25,
+                "win_rate": 0.67,
+                "sharpe_ratio": 1.85,
+                "max_drawdown": -0.12,
+                "num_trades": 45,
+                ...
+            },
+            "charts": {
+                "equity_curve": [
+                    {"date": "2023-01-01", "equity": 100000},
+                    {"date": "2023-01-05", "equity": 102500},
+                    ...
+                ],
+                "drawdown": [
+                    {"date": "2023-01-01", "drawdown": 0.0},
+                    {"date": "2023-01-10", "drawdown": -0.05},
+                    ...
+                ],
+                "monthly_returns": {
+                    "2023-01": 0.05,
+                    "2023-02": -0.02,
+                    ...
+                }
+            },
+            "explanation": "The RSI Oversold strategy generated 45 trades over the 2-year period...",
+            "period": "2023-01-01 to 2025-01-01",
+            "initial_capital": 100000
+        }
+    
+    Examples:
+        POST /backtest/run-from-description
+        {
+            "strategy_description": "Buy when RSI drops below 30 and sell when it goes above 70",
+            "symbol": "AAPL",
+            "user_id": "user123"
+        }
+    """
+    try:
+        from backtesting.engine import BacktestEngine
+        from backtesting.builder import strategy_builder
+        from agents.strategy_translator import strategy_translator
+        from datetime import datetime, timedelta
+        
+        logger.info(f"Running complete backtest workflow for {symbol}: '{strategy_description[:80]}...'")
+        
+        # STEP 1: Translate natural language to strategy
+        logger.info("Step 1: Translating natural language strategy")
+        try:
+            strategy_def = await strategy_translator.translate_strategy(
+                natural_language=strategy_description,
+                symbol=symbol
+            )
+            
+            if strategy_def.get('error'):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Strategy interpretation failed: {strategy_def['message']}"
+                )
+            
+            logger.info(f"Strategy translated: {strategy_def['name']}")
+        except Exception as e:
+            logger.error(f"Strategy translation failed: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not interpret strategy: {str(e)}. Please rephrase with more specific indicators."
+            )
+        
+        # STEP 2: Set date range (default to 2 years)
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        
+        logger.info(f"Backtesting period: {start_date} to {end_date}")
+        
+        # STEP 3: Build and run strategy
+        logger.info("Step 2: Building and running backtest")
+        try:
+            strategy_func = await strategy_builder.build_strategy(strategy_def)
+            engine = BacktestEngine()
+            
+            results = await engine.run_backtest(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                strategy_fn=strategy_func,
+                initial_capital=initial_capital,
+                include_visuals=True
+            )
+            
+            logger.info(
+                f"Backtest complete: {results['num_trades']} trades, "
+                f"{results['win_rate']:.2%} win rate, {results['total_return_pct']:.2%} return"
+            )
+        except Exception as e:
+            logger.error(f"Backtest execution failed: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Backtest failed: {str(e)}"
+            )
+        
+        # STEP 4: Generate explanation
+        logger.info("Step 3: Generating explanation")
+        try:
+            explanation = await engine.generate_explanation(
+                strategy_name=strategy_def['name'],
+                strategy_description=strategy_def.get('description', 'Custom trading strategy'),
+                metrics=results,
+                symbol=symbol,
+                period=f"{start_date} to {end_date}"
+            )
+            logger.info(f"Explanation generated: {len(explanation)} characters")
+        except Exception as e:
+            logger.error(f"Explanation generation failed: {e}")
+            explanation = f"Backtest completed for {strategy_def['name']} on {symbol}. " \
+                         f"Total return: {results['total_return_pct']:.2%}, " \
+                         f"Win rate: {results['win_rate']:.2%}, " \
+                         f"Sharpe ratio: {results['sharpe_ratio']:.2f}."
+        
+        # STEP 5: Assemble comprehensive response
+        response = {
+            'strategy': strategy_def,
+            'metrics': {
+                'total_return': results.get('total_return', 0),
+                'total_return_pct': results.get('total_return_pct', 0),
+                'win_rate': results.get('win_rate', 0),
+                'profit_factor': results.get('profit_factor', 0),
+                'sharpe_ratio': results.get('sharpe_ratio', 0),
+                'max_drawdown': results.get('max_drawdown', 0),
+                'num_trades': results.get('num_trades', 0),
+                'winning_trades': results.get('winning_trades', 0),
+                'losing_trades': results.get('losing_trades', 0),
+                'avg_win': results.get('avg_win', 0),
+                'avg_loss': results.get('avg_loss', 0),
+            },
+            'charts': {
+                'equity_curve': results.get('visuals', {}).get('equity_curve', []),
+                'drawdown': results.get('visuals', {}).get('drawdown_series', []),
+                'monthly_returns': results.get('visuals', {}).get('monthly_returns', {}),
+                'trade_distribution': results.get('visuals', {}).get('trade_distribution', {})
+            },
+            'explanation': explanation,
+            'period': f"{start_date} to {end_date}",
+            'initial_capital': initial_capital,
+            'symbol': symbol
+        }
+        
+        logger.info(f"Complete backtest workflow finished for {symbol}")
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Complete backtest workflow error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Backtest workflow failed: {str(e)}"
+        )
 
 # ============================================================================
 # SENTIMENT ANALYSIS ENDPOINTS

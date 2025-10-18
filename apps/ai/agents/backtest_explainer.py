@@ -4,6 +4,7 @@ Uses Groq for fast, detailed performance analysis
 """
 import logging
 import time
+import json
 from typing import Dict, Optional
 from openai import OpenAI
 
@@ -64,6 +65,76 @@ BACKTEST_EXPLAINER_SYSTEM_PROMPT = """You are an expert trading analyst and educ
 - Making promises about future performance
 - Saying "in conclusion" or "to summarize" (just flow naturally)
 - Listing bullet points (make it narrative)"""
+
+# System prompt for strategy building from natural language
+STRATEGY_BUILDER_SYSTEM_PROMPT = """You are an expert trading strategy designer and developer. Your role is to convert natural language strategy descriptions into precise, executable JSON-based trading rules.
+
+**Your task**: Analyze what the user describes, extract the core strategy logic, and convert it into a structured format that can be backtested.
+
+**Strategy JSON Format** (return ONLY valid JSON, no explanations):
+{
+    "name": "Human-readable strategy name",
+    "description": "Clear description of what this strategy does",
+    "category": "Trend Following|Mean Reversion|Momentum|Breakout|Technical|Other",
+    "difficulty": "Beginner|Intermediate|Advanced",
+    "indicators": [
+        {"type": "rsi", "period": 14},
+        {"type": "sma", "period": 20},
+        {"type": "macd"},
+        {"type": "bollinger_bands", "period": 20, "std_dev": 2},
+        {"type": "atr", "period": 14}
+    ],
+    "entry_rules": [
+        {"indicator": "rsi", "condition": "<", "value": "sma_20"},
+        {"indicator": "price", "condition": "crosses_above", "value": "sma_20"}
+    ],
+    "exit_rules": [
+        {"indicator": "rsi", "condition": ">", "value": 70}
+    ],
+    "position_sizing": {
+        "type": "fixed_percent",
+        "value": 0.1
+    },
+    "risk_management": {
+        "stop_loss_percent": 0.05,
+        "take_profit_percent": 0.10
+    }
+}
+
+**Available Indicators**:
+- rsi (period: 5-50)
+- sma (period: 5-200)
+- ema (period: 5-200)
+- macd (fast: 12, slow: 26, signal: 9)
+- bollinger_bands (period: 10-50, std_dev: 1-3)
+- atr (period: 5-20)
+- stochastic (period: 14)
+- adx (period: 14)
+
+**Conditions**:
+- Comparison: <, >, ==, <=, >=
+- Crossovers: crosses_above, crosses_below
+
+**Guidelines**:
+- Infer the most reasonable values if user doesn't specify
+- Use RSI 14 as default RSI period
+- Use SMA 20 for trend, SMA 50 for longer trends
+- Stop loss typically 3-5%, take profit 10-15% for trend following
+- Stop loss 2-3%, take profit 5-10% for mean reversion
+- Only include indicators that are actually used in the rules
+- Be realistic - suggest beginner difficulty for simple rules (1-2 indicators), intermediate for 2-3, advanced for 4+
+- If the description is too vague or illogical, respond with an error object:
+  {
+    "error": true,
+    "message": "Why this strategy doesn't work or is unclear",
+    "suggestion": "What clarification or change is needed"
+  }
+
+**Examples**:
+- "Buy when RSI is below 30" → RSI oversold, mean reversion
+- "Buy when price breaks above 20-day moving average" → Momentum breakout, trend following
+- "MACD crossover strategy" → MACD crosses above signal line for entry
+- "Bollinger band squeeze with breakout" → Use Bollinger bands, enter on breakout"""
 
 class BacktestExplainerAgent:
     """
@@ -273,6 +344,133 @@ From a risk-adjusted perspective, the Sharpe ratio of {sharpe:.2f} indicates {qu
 {'This strategy shows promise and may be worth considering with proper risk management.' if total_return > 0 and sharpe > 1 else 'This strategy may need refinement or may not be suitable for current market conditions.'}
 
 Remember, past performance does not guarantee future results. Always test strategies thoroughly and use appropriate position sizing."""
+
+    async def build_strategy_from_description(
+        self,
+        description: str,
+        symbol: str = None
+    ) -> Dict:
+        """
+        Convert natural language strategy description to backtestable JSON rules
+        
+        Args:
+            description: Natural language strategy description (e.g., "Buy when RSI below 30")
+            symbol: Optional stock symbol for context
+        
+        Returns:
+            Strategy JSON dict ready for backtesting or error dict
+            {
+                "name": "...",
+                "description": "...",
+                "category": "...",
+                "indicators": [...],
+                "entry_rules": [...],
+                "exit_rules": [...],
+                "position_sizing": {...},
+                "risk_management": {...}
+            }
+            
+            OR error response:
+            {
+                "error": true,
+                "message": "Why this failed",
+                "suggestion": "How to fix it"
+            }
+        """
+        logger.info(f"Building strategy from description: {description[:100]}...")
+        start_time = time.time()
+        
+        try:
+            # Call Groq to convert description to JSON rules
+            strategy_json = await self._call_groq_strategy_builder(description, symbol)
+            
+            # Validate the JSON
+            if strategy_json.get("error"):
+                logger.warning(f"Strategy validation failed: {strategy_json.get('message')}")
+                return strategy_json  # Return error object as-is
+            
+            # Log success
+            latency = time.time() - start_time
+            logger.info(
+                f"Strategy built successfully: '{strategy_json.get('name')}' "
+                f"(latency: {latency*1000:.0f}ms)"
+            )
+            
+            return strategy_json
+            
+        except Exception as e:
+            logger.error(f"Failed to build strategy: {e}")
+            return {
+                "error": True,
+                "message": f"Failed to interpret strategy: {str(e)}",
+                "suggestion": "Please try rephrasing your strategy description with more specific indicators or entry/exit rules."
+            }
+    
+    async def _call_groq_strategy_builder(
+        self,
+        description: str,
+        symbol: str = None,
+        retry: bool = True
+    ) -> Dict:
+        """Call Groq to convert natural language to strategy JSON"""
+        try:
+            # Build context
+            context = f"Stock symbol: {symbol}" if symbol else "No specific symbol context"
+            
+            # Create user prompt
+            user_prompt = f"""Convert this trading strategy description into precise JSON rules:
+
+{context}
+
+**Strategy Description**: {description}
+
+Return ONLY valid JSON that matches the required format. No explanations, no markdown, just the JSON object."""
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": STRATEGY_BUILDER_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,  # Low temperature for consistent JSON
+                max_tokens=1000
+            )
+            
+            content = response.choices[0].message.content
+            if not content:
+                raise ValueError("Empty response from Groq")
+            
+            # Parse JSON from response
+            content = content.strip()
+            
+            # Try to extract JSON if wrapped in markdown code blocks
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+            
+            # Parse JSON
+            strategy_dict = json.loads(content)
+            
+            return strategy_dict
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing failed: {e}. Content: {content[:200]}")
+            if retry:
+                logger.warning("Retrying strategy build...")
+                return await self._call_groq_strategy_builder(description, symbol, retry=False)
+            else:
+                return {
+                    "error": True,
+                    "message": "Strategy description resulted in invalid rules. Please be more specific.",
+                    "suggestion": "Try describing specific indicators (RSI, MACD, SMA) and clear entry/exit conditions."
+                }
+        except Exception as e:
+            if retry:
+                logger.warning(f"Groq call failed, retrying: {e}")
+                return await self._call_groq_strategy_builder(description, symbol, retry=False)
+            else:
+                raise
 
 # Global instance
 backtest_explainer = BacktestExplainerAgent()
