@@ -127,21 +127,23 @@ export default function Home() {
         </motion.div>
       </motion.section>
 
-      {/* Features Grid with Central Preview */}
-      <section ref={featuresRef} className="min-h-screen bg-gradient-to-b from-[#FFF8DC] to-[#FFE4B5] py-32 px-8 relative overflow-hidden">
-        {/* Central App Preview - Behind Content but VISIBLE */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-[700px] pointer-events-none z-0">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 0.5, scale: 1 }}
-            transition={{ duration: 1 }}
-            className="w-full h-full"
-          >
-            <AppPreview activeSection={activeSection} />
-          </motion.div>
-        </div>
+      {/* Features Grid with Sticky Central Preview */}
+      <section ref={featuresRef} className="relative bg-gradient-to-b from-[#FFF8DC] to-[#FFE4B5] py-32 px-8">
+        <div className="max-w-7xl mx-auto relative">
+          {/* Sticky Central App Preview - Stays visible while scrolling */}
+          <div className="sticky top-32 left-0 right-0 mx-auto w-full max-w-4xl h-[700px] pointer-events-none z-0 mb-[-700px]">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, rotateY: -15 }}
+              animate={{ opacity: 0.6, scale: 1, rotateY: 0 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="w-full h-full"
+              style={{ perspective: '1000px' }}
+            >
+              <AppPreview activeSection={activeSection} />
+            </motion.div>
+          </div>
 
-        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="relative z-10">
           <AnimatedSection>
             <h2 className="text-6xl font-bold text-center mb-6 text-[#2F1810]">
               Everything you need to trade
@@ -229,6 +231,65 @@ export default function Home() {
               </motion.div>
             </AnimatedSection>
           </div>
+        </div>
+      </section>
+
+      {/* Spacer to allow more scrolling with preview visible */}
+      <section className="min-h-screen bg-gradient-to-b from-[#FFE4B5] to-[#FFF8DC] py-32 px-8 relative">
+        <div className="max-w-7xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-5xl font-bold text-[#2F1810] mb-6">
+              See your data come alive
+            </h2>
+            <p className="text-2xl text-[#8B4513] font-semibold mb-12">
+              Real-time insights that adapt to your trading style
+            </p>
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto"
+            >
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className="p-8 bg-gradient-to-br from-white to-[#FFE4B5] rounded-2xl shadow-lg"
+              >
+                <div className="w-16 h-16 mb-4 bg-gradient-to-br from-[#D2691E] to-[#F4A460] rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-[#2F1810] mb-2">Instant Updates</h3>
+                <p className="text-[#5D3A1A]">Real-time market data and alerts</p>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className="p-8 bg-gradient-to-br from-white to-[#FFE4B5] rounded-2xl shadow-lg"
+              >
+                <div className="w-16 h-16 mb-4 bg-gradient-to-br from-[#8B4513] to-[#A0522D] rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-[#2F1810] mb-2">Personalized</h3>
+                <p className="text-[#5D3A1A]">AI learns your preferences</p>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                className="p-8 bg-gradient-to-br from-white to-[#FFE4B5] rounded-2xl shadow-lg"
+              >
+                <div className="w-16 h-16 mb-4 bg-gradient-to-br from-[#B8860B] to-[#DAA520] rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-[#2F1810] mb-2">Anywhere</h3>
+                <p className="text-[#5D3A1A]">Access on any device</p>
+              </motion.div>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 

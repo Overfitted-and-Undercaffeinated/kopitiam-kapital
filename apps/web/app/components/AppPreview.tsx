@@ -8,17 +8,20 @@ interface AppPreviewProps {
 
 export default function AppPreview({ activeSection }: AppPreviewProps) {
   return (
-    <div className="relative w-full h-full max-w-4xl mx-auto">
+    <div className="relative w-full h-full max-w-4xl mx-auto" style={{ perspective: '2000px' }}>
       {/* Morning Brief Preview */}
       <motion.div
         className="absolute inset-0 bg-white rounded-3xl shadow-[0_20px_80px_rgba(0,0,0,0.3)] overflow-hidden border-4 border-[#8B4513]"
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.8, rotateY: -25, x: -100 }}
         animate={{
           opacity: activeSection === 'morning' ? 1 : 0,
-          scale: activeSection === 'morning' ? 1 : 0.9,
+          scale: activeSection === 'morning' ? 1 : 0.8,
+          rotateY: activeSection === 'morning' ? 0 : -25,
+          x: activeSection === 'morning' ? 0 : -100,
           zIndex: activeSection === 'morning' ? 10 : 0,
         }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
+        style={{ transformStyle: 'preserve-3d' }}
       >
         <div className="p-8 h-full">
           <div className="flex items-center justify-between mb-6">
@@ -54,13 +57,16 @@ export default function AppPreview({ activeSection }: AppPreviewProps) {
       {/* Dashboard Preview */}
       <motion.div
         className="absolute inset-0 bg-white rounded-3xl shadow-[0_20px_80px_rgba(0,0,0,0.3)] overflow-hidden border-4 border-[#D2691E]"
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.8, rotateY: 25, x: 100 }}
         animate={{
           opacity: activeSection === 'dashboard' ? 1 : 0,
-          scale: activeSection === 'dashboard' ? 1 : 0.9,
+          scale: activeSection === 'dashboard' ? 1 : 0.8,
+          rotateY: activeSection === 'dashboard' ? 0 : 25,
+          x: activeSection === 'dashboard' ? 0 : 100,
           zIndex: activeSection === 'dashboard' ? 10 : 0,
         }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
+        style={{ transformStyle: 'preserve-3d' }}
       >
         <div className="p-8 h-full">
           <div className="flex items-center justify-between mb-6">
@@ -117,13 +123,16 @@ export default function AppPreview({ activeSection }: AppPreviewProps) {
       {/* EOD Report Preview */}
       <motion.div
         className="absolute inset-0 bg-white rounded-3xl shadow-[0_20px_80px_rgba(0,0,0,0.3)] overflow-hidden border-4 border-[#B8860B]"
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.8, rotateX: 25, y: 100 }}
         animate={{
           opacity: activeSection === 'eod' ? 1 : 0,
-          scale: activeSection === 'eod' ? 1 : 0.9,
+          scale: activeSection === 'eod' ? 1 : 0.8,
+          rotateX: activeSection === 'eod' ? 0 : 25,
+          y: activeSection === 'eod' ? 0 : 100,
           zIndex: activeSection === 'eod' ? 10 : 0,
         }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
+        style={{ transformStyle: 'preserve-3d' }}
       >
         <div className="p-8 h-full">
           <div className="flex items-center justify-between mb-6">
