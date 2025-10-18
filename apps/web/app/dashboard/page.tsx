@@ -281,30 +281,36 @@ export default function DashboardPage() {
                 Your AI-powered trading companion
               </p>
             </div>
-            <div className="flex gap-3">
-              <motion.button
-                onClick={() => setShowMorningBrief(true)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-4 py-2 bg-[#8B7355] text-white rounded-lg text-sm font-medium hover:bg-[#6F5D47] transition-colors"
-              >
-                Morning Brief
-              </motion.button>
-              <motion.button
-                onClick={() => setShowEODBrief(true)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-4 py-2 bg-white text-[#2F1810] rounded-lg text-sm font-medium hover:bg-[#F5F5F4] transition-colors border border-[#E5E5E5]"
-              >
-                EOD Report
-              </motion.button>
+            <div className="flex items-center gap-4">
+              <div className="flex gap-2">
+                <motion.button
+                  onClick={() => setShowMorningBrief(true)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-3 py-1.5 bg-[#8B7355] text-white rounded-lg text-xs font-medium hover:bg-[#6F5D47] transition-colors"
+                >
+                  Morning Brief
+                </motion.button>
+                <motion.button
+                  onClick={() => setShowEODBrief(true)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-3 py-1.5 bg-white text-[#2F1810] rounded-lg text-xs font-medium hover:bg-[#F5F5F4] transition-colors border border-[#E5E5E5]"
+                >
+                  EOD Report
+                </motion.button>
+              </div>
               <motion.a
                 href="/assistant"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-4 py-2 bg-gradient-to-r from-[#CD853F] to-[#D2691E] text-white rounded-lg text-sm font-medium hover:from-[#D2691E] hover:to-[#8B4513] transition-all shadow-md"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 bg-gradient-to-r from-[#FF6B35] via-[#F7931E] to-[#FFD23F] text-white rounded-2xl text-lg font-bold hover:from-[#F7931E] hover:via-[#FF6B35] hover:to-[#FFD23F] transition-all shadow-xl border-2 border-white/20 relative overflow-hidden"
               >
-                🤠 Ask Kopi
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full hover:translate-x-full transition-transform duration-1000"></div>
+                <span className="relative z-10 flex items-center gap-2">
+                  🤠 Ask Kopi
+                  <span className="text-sm opacity-80">→</span>
+                </span>
               </motion.a>
             </div>
           </div>
@@ -713,22 +719,6 @@ export default function DashboardPage() {
         />
       )}
       
-      {/* Debug info - remove this later */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed top-4 left-4 bg-black text-white p-2 text-xs z-[999]">
-          <div>User Loading: {userLoading ? 'Yes' : 'No'}</div>
-          <div>User: {user ? user.name : 'None'}</div>
-          <div>Error: {userError || 'None'}</div>
-          <div className="mt-2">
-            <button 
-              onClick={() => window.location.href = '/login?redirectTo=/dashboard'}
-              className="bg-red-600 px-2 py-1 rounded text-xs"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Brief Overlays - Only show after welcome sequence */}
       {welcomeComplete && (
