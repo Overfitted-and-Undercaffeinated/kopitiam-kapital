@@ -1,0 +1,191 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { onboardingSchema, mapRiskProfile, mapExperienceLevel, mapTradingCapital } from '@/lib/validations/onboarding'
+import { Prisma } from '@prisma/client'
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+    
+    // Validate input data
+    const validationResult = onboardingSchema.safeParse(body)
+    
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { 
+          error: 'Validation failed', 
+          details: validationResult.error.flatten().fieldErrors 
+        },
+        { status: 400 }
+      )
+    }
+
+    const {
+      name,
+      email,
+      riskProfile,
+      experienceLevel,
+      tradingCapital,
+      primaryMarkets,
+      briefTime,
+      voicePreference,
+      watchlist,
+    } = validationResult.data
+
+    console.log('📝 Creating user with data:', { name, email, riskProfile })
+
+    // Use transaction to ensure atomicity
+    const result = await prisma.$transaction(async (tx) => {
+      // Create user
+      const user = await tx.user.create({
+        data: {
+          email,
+          name,
+          riskProfile: mapRiskProfile(riskProfile),
+          experienceLevel: mapExperienceLevel(experienceLevel),
+          tradingCapitalRange: mapTradingCapital(tradingCapital),
+          primaryMarkets,
+          briefTime,
+          preferredVoice: voicePreference,
+        },
+      })
+
+      console.log('✅ User created:', user.id)
+
+      // If watchlist is provided, create watchlist entries
+      if (watchlist && watchlist.length > 0) {
+        console.log('📋 Adding watchlist items:', watchlist)
+        
+        // Process watchlist items in parallel for better performance
+        const watchlistPromises = watchlist.map(async (symbol) => {
+          // Upsert instrument (create if doesn't exist, return if exists)
+          const instrument = await tx.instrument.upsert({
+            where: { symbol },
+            update: {},
+            create: {
+              symbol,
+              name: symbol, // Placeholder name
+            },
+          })
+
+          // Create watchlist entry
+          return tx.userWatchlist.create({
+            data: {
+              userId: user.id,
+              instrumentId: instrument.id,
+            },
+          })
+        })
+
+        await Promise.all(watchlistPromises)
+        console.log('✅ Watchlist items added')
+      }
+
+      return user
+    })
+
+    // Set user ID in a cookie for session management (optional)
+    const response = NextResponse.json({ 
+      success: true, 
+      userId: result.id,
+      message: 'Onboarding completed successfully!' 
+    })
+
+    // Set a simple session cookie (consider using a proper auth solution in production)
+    response.cookies.set('user_id', result.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    })
+
+    return response
+
+  } catch (error: any) {
+    console.error('❌ Onboarding error:', error)
+    
+    // Handle Prisma-specific errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // Handle unique constraint violations (duplicate email)
+      if (error.code === 'P2002') {
+        return NextResponse.json(
+          { 
+            error: 'Email already registered', 
+            message: 'This email is already associated with an account. Please use a different email or contact support.' 
+          },
+          { status: 400 }
+        )
+      }
+
+      // Handle foreign key constraint violations
+      if (error.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Invalid reference', message: 'One or more referenced items do not exist.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Handle validation errors
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return NextResponse.json(
+        { error: 'Invalid data format', message: 'The provided data does not match the expected format.' },
+        { status: 400 }
+      )
+    }
+
+    // Generic error response
+    return NextResponse.json(
+      { 
+        error: 'Failed to complete onboarding', 
+        message: process.env.NODE_ENV === 'development' ? error.message : 'An unexpected error occurred. Please try again.' 
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// Optional: GET endpoint to retrieve user onboarding status
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const email = searchParams.get('email')
+
+    if (!email) {
+      return NextResponse.json(
+        { error: 'Email parameter is required' },
+        { status: 400 }
+      )
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+      },
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { exists: false },
+        { status: 200 }
+      )
+    }
+
+    return NextResponse.json({
+      exists: true,
+      user,
+    })
+
+  } catch (error: any) {
+    console.error('❌ Error checking user:', error)
+    return NextResponse.json(
+      { error: 'Failed to check user status' },
+      { status: 500 }
+    )
+  }
+}
+

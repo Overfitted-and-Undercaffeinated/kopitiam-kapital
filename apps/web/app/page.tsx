@@ -30,7 +30,7 @@ function AnimatedSection({ children, delay = 0 }: { children: React.ReactNode; d
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null)
   const featuresRef = useRef<HTMLDivElement>(null)
-  const [activeSection, setActiveSection] = useState<'hero' | 'blank' | 'intro' | 'morning' | 'dashboard' | 'eod' | 'overnight' | 'cta'>('hero')
+  const [activeSection, setActiveSection] = useState<'hero' | 'blank' | 'intro' | 'morning' | 'dashboard' | 'sentiment' | 'eod' | 'overnight' | 'cta'>('hero')
   
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -51,7 +51,7 @@ export default function Home() {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          const sectionName = (entry.target as HTMLElement).dataset.section as 'hero' | 'blank' | 'intro' | 'morning' | 'dashboard' | 'eod' | 'overnight' | 'cta'
+          const sectionName = (entry.target as HTMLElement).dataset.section as 'hero' | 'blank' | 'intro' | 'morning' | 'dashboard' | 'sentiment' | 'eod' | 'overnight' | 'cta'
           if (sectionName) {
             setActiveSection(sectionName)
           }
@@ -182,6 +182,104 @@ export default function Home() {
                 transition={{ duration: 0.6, ease: 'easeOut' }}
               >
                 <AppPreview activeSection={activeSection} />
+              </motion.div>
+            )}
+
+            {/* Sentiment Analysis view */}
+            {activeSection === 'sentiment' && (
+              <motion.div
+                className="w-[32rem] h-[50rem] bg-white rounded-3xl overflow-hidden shadow-2xl"
+                initial={{ rotateY: -90, opacity: 0 }}
+                animate={{ rotateY: 0, opacity: 1 }}
+                exit={{ rotateY: 90, opacity: 0 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+              >
+                <div className="p-8 h-full overflow-y-auto">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-[#9B59B6] to-[#8E44AD] rounded-full flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#2F1810]">Sentiment Analysis</h3>
+                    </div>
+                    <div className="text-sm font-semibold text-[#8E44AD] bg-[#F4ECF7] px-3 py-1 rounded-full">Live</div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="p-5 bg-gradient-to-r from-[#E8DAEF] to-[#F4ECF7] rounded-xl shadow-md">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <h4 className="font-bold text-[#2F1810]">Top Trending</h4>
+                        </div>
+                        <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded">+85%</span>
+                      </div>
+                      <p className="text-sm text-[#5D3A1A] mb-2">DBS Group Holdings announces strong Q3 results</p>
+                      <div className="flex gap-2 text-xs">
+                        <span className="bg-[#9B59B6]/20 text-[#8E44AD] px-2 py-1 rounded">Reddit</span>
+                        <span className="bg-[#9B59B6]/20 text-[#8E44AD] px-2 py-1 rounded">Twitter</span>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5 bg-gradient-to-r from-[#D7BDE2] to-[#E8DAEF] rounded-xl shadow-md">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <h4 className="font-bold text-[#2F1810]">Community Buzz</h4>
+                        </div>
+                        <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded">+72%</span>
+                      </div>
+                      <p className="text-sm text-[#5D3A1A] mb-2">Singapore tech stocks gaining momentum</p>
+                      <div className="flex gap-2 text-xs">
+                        <span className="bg-[#9B59B6]/20 text-[#8E44AD] px-2 py-1 rounded">Forums</span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-gradient-to-r from-[#C39BD3] to-[#D7BDE2] rounded-xl shadow-md">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <h4 className="font-bold text-[#2F1810]">Rising Interest</h4>
+                        </div>
+                        <span className="text-xs text-purple-600 font-bold bg-purple-50 px-2 py-1 rounded">+68%</span>
+                      </div>
+                      <p className="text-sm text-[#5D3A1A] mb-2">REITs discussion heating up amid rate changes</p>
+                      <div className="flex gap-2 text-xs">
+                        <span className="bg-[#9B59B6]/20 text-[#8E44AD] px-2 py-1 rounded">Reddit</span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-gradient-to-r from-[#AF7AC5] to-[#C39BD3] rounded-xl shadow-md">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                          <h4 className="font-bold text-[#2F1810]">Watch Alert</h4>
+                        </div>
+                        <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">+61%</span>
+                      </div>
+                      <p className="text-sm text-[#5D3A1A] mb-2">Banking sector outlook improving</p>
+                      <div className="flex gap-2 text-xs">
+                        <span className="bg-[#9B59B6]/20 text-[#8E44AD] px-2 py-1 rounded">News</span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-gradient-to-r from-[#9B59B6] to-[#AF7AC5] rounded-xl shadow-md">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                          <h4 className="font-bold text-white">Emerging Topic</h4>
+                        </div>
+                        <span className="text-xs text-yellow-600 font-bold bg-yellow-50 px-2 py-1 rounded">+54%</span>
+                      </div>
+                      <p className="text-sm text-white/90 mb-2">Green energy stocks catching attention</p>
+                      <div className="flex gap-2 text-xs">
+                        <span className="bg-white/20 text-white px-2 py-1 rounded">Social</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -780,7 +878,186 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Slide 5: EOD Report */}
+        {/* Slide 5: Pocket Sentiment Analysis */}
+        <section 
+          data-section="sentiment"
+          className="min-h-[120vh] bg-[#9B59B6] flex items-center justify-center px-8 py-40 relative"
+        >
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-20 items-center">
+              {/* Left Cards */}
+              <div className="space-y-8">
+                <AnimatedSection delay={0.2}>
+                  <motion.div 
+                    className="bg-white rounded-2xl p-8 pointer-events-auto h-[280px] flex flex-col shadow-xl"
+                    whileHover={{ scale: 1.02, y: -3 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-[#E74C3C] to-[#C0392B] rounded-xl flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl font-bold text-[#2F1810]" style={{ fontFamily: 'var(--font-bowlby)' }}>Social Scraping</h3>
+                    </div>
+                    <p className="text-[#2F1810] font-medium leading-relaxed mb-4">
+                      AI-powered web scraping across Reddit, Twitter, forums using Exa for comprehensive coverage.
+                    </p>
+                    <div className="mt-auto space-y-2">
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Reddit communities</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Social media feeds</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Trading forums</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </AnimatedSection>
+
+                <AnimatedSection delay={0.3}>
+                  <motion.div 
+                    className="bg-white rounded-2xl p-8 pointer-events-auto h-[280px] flex flex-col shadow-xl"
+                    whileHover={{ scale: 1.02, y: -3 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-[#3498DB] to-[#2980B9] rounded-xl flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-xl font-bold text-[#2F1810]" style={{ fontFamily: 'var(--font-bowlby)' }}>AI Scoring</h4>
+                    </div>
+                    <p className="text-[#2F1810] font-medium leading-relaxed mb-4">
+                      Groq-powered sentiment analysis scores every article and discussion in real-time.
+                    </p>
+                    <div className="mt-auto space-y-2">
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Real-time scoring</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Context understanding</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Emotion detection</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </AnimatedSection>
+              </div>
+
+              {/* Center - Empty space for sticky preview */}
+              <div></div>
+
+              {/* Right Cards */}
+              <div className="space-y-8">
+                <AnimatedSection delay={0.4}>
+                  <motion.div 
+                    className="bg-white rounded-2xl p-8 pointer-events-auto h-[280px] flex flex-col shadow-xl"
+                    whileHover={{ scale: 1.02, y: -3 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-[#F39C12] to-[#E67E22] rounded-xl flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-xl font-bold text-[#2F1810]" style={{ fontFamily: 'var(--font-bowlby)' }}>Top 5 Articles</h4>
+                    </div>
+                    <p className="text-[#2F1810] font-medium leading-relaxed mb-4">
+                      Get the highest-scored articles and discussions delivered to your dashboard.
+                    </p>
+                    <div className="mt-auto space-y-2">
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Ranked by relevance</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Source attribution</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Click to read full</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </AnimatedSection>
+
+                <AnimatedSection delay={0.5}>
+                  <motion.div 
+                    className="bg-white rounded-2xl p-8 pointer-events-auto h-[280px] flex flex-col shadow-xl"
+                    whileHover={{ scale: 1.02, y: -3 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-[#27AE60] to-[#229954] rounded-xl flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-xl font-bold text-[#2F1810]" style={{ fontFamily: 'var(--font-bowlby)' }}>Trend Detection</h4>
+                    </div>
+                    <p className="text-[#2F1810] font-medium leading-relaxed mb-4">
+                      Spot emerging trends before they hit mainstream news channels.
+                    </p>
+                    <div className="mt-auto space-y-2">
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Early signals</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Momentum tracking</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#5D3A1A] text-sm">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Viral prediction</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </AnimatedSection>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Slide 6: EOD Report */}
         <section 
           data-section="eod"
           className="min-h-[120vh] bg-[#B8860B] flex items-center justify-center px-8 py-40 relative"
