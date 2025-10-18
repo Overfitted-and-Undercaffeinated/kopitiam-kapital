@@ -98,25 +98,23 @@ export default function AssistantPage() {
     }
   }
 
-  const fetchRealAIResponse = async (userQuestion: string): Promise<{ short: string; detailed: string }> => {
+  const fetchRealAIResponse = async (userQuestion: string): Promise<{ short: string; detailed: string; metadata?: any }> => {
     const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
     const userId = localStorage.getItem('userId') || 'demo_user'
     
     try {
-      console.log('🤖 Calling AI Orchestrator:', { query: userQuestion, userId })
+      console.log('🤖 Calling AI Chat Assistant:', { message: userQuestion, userId })
       
-      const response = await fetch(`${AI_API_URL}/ai/orchestrate`, {
+      // Use URLSearchParams for form data
+      const params = new URLSearchParams({
+        message: userQuestion,
+        user_id: userId,
+      })
+      
+      const response = await fetch(`${AI_API_URL}/assistant/chat?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: userQuestion,
-          user_id: userId,
-          context: {
-            userName: userName,
-            timestamp: new Date().toISOString()
-          }
-        }),
-        signal: AbortSignal.timeout(30000) // 30 second timeout
+        signal: AbortSignal.timeout(60000) // 60 second timeout for backtests
       })
       
       if (!response.ok) {
@@ -126,15 +124,12 @@ export default function AssistantPage() {
       const data = await response.json()
       console.log('✅ AI Response received:', data)
       
-      // Extract response text - the orchestrator returns a response field
-      const responseText = data.response || data.text || data.message || 'No response from AI'
+      // Extract response from new chat orchestrator format
+      const short = data.short_response || data.shortResponse || 'No response'
+      const detailed = data.detailed_response || data.detailedResponse || 'No detailed response'
+      const metadata = data.metadata || {}
       
-      // Split response into short (first paragraph) and detailed (full text)
-      const paragraphs = responseText.split('\n\n').filter((p: string) => p.trim().length > 0)
-      const short = paragraphs[0] || responseText.substring(0, 200)
-      const detailed = responseText
-      
-      return { short, detailed }
+      return { short, detailed, metadata }
       
     } catch (error) {
       console.error('❌ AI API Error:', error)
@@ -142,7 +137,8 @@ export default function AssistantPage() {
       // Fallback to a friendly error message
       return {
         short: `Whoa there, ${userName}! My AI brain's takin' a coffee break. Let me give ya what I remember...`,
-        detailed: `I'm havin' trouble connectin' to the main AI engine right now, partner. This might be because:\n\n• The backend server isn't runnin' (try: cd apps/ai && uvicorn main:app --reload)\n• Network connection issues\n• API timeout (your question might need more thinkin' time)\n\nIn the meantime, here's some general advice:\n\n• For stock recommendations, I typically analyze sentiment from multiple sources (news, Reddit, social media)\n• I run backtests to validate strategies before recommendin' 'em\n• I personalize recommendations based on your risk profile in Mem0\n\nTry askin' me again in a moment, or check that the AI backend is runnin'!`
+        detailed: `I'm havin' trouble connectin' to the main AI engine right now, partner. This might be because:\n\n• The backend server isn't runnin' (try: cd apps/ai && uvicorn main:app --reload)\n• Network connection issues\n• API timeout (backtests can take 30-60 seconds)\n\nIn the meantime, here's what I can do:\n\n• Backtest trading strategies on historical data\n• Analyze sentiment from multiple sources (news, social media)\n• Generate trading recommendations\n• Explain trading concepts\n• Research market trends\n\nTry askin' me again in a moment, or check that the AI backend is runnin'!`,
+        metadata: {}
       }
     }
   }
@@ -172,6 +168,7 @@ export default function AssistantPage() {
       role: 'assistant',
       shortResponse: response.short,
       detailedResponse: response.detailed,
+      metadata: response.metadata,
       timestamp: new Date()
     }
     setMessages(prev => [...prev, assistantMsg])

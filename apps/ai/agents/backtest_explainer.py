@@ -78,6 +78,52 @@ class BacktestExplainerAgent:
         self.model = "llama-3.3-70b-versatile"
         logger.info(f"Initialized BacktestExplainerAgent with model: {self.model}")
     
+    async def explain(
+        self,
+        backtest_result: Dict,
+        strategy_name: str,
+        symbol: str,
+        conversational: bool = True
+    ) -> str:
+        """
+        Generate explanation of backtest results (new unified interface)
+        
+        Args:
+            backtest_result: Complete backtest result dict with metrics
+            strategy_name: Name of the strategy
+            symbol: Stock symbol
+            conversational: If True, use conversational narrative style
+        
+        Returns:
+            Conversational narrative explanation
+        """
+        # Extract metrics
+        metrics = backtest_result
+        
+        # Determine time period from trades if available
+        trades = backtest_result.get('trades', [])
+        if trades and len(trades) > 0:
+            first_trade = trades[0]
+            last_trade = trades[-1]
+            period = f"{first_trade.get('entry_date', '')[:10]} to {last_trade.get('exit_date', '')[:10]}"
+        else:
+            period = "2 years"
+        
+        # Generate conversational narrative
+        if conversational:
+            return await self.generate_explanation(
+                strategy_name=strategy_name,
+                strategy_description=f"{strategy_name} strategy",
+                metrics=metrics,
+                symbol=symbol,
+                period=period
+            )
+        else:
+            # Fall back to basic explanation
+            return self._generate_fallback_explanation(
+                strategy_name, metrics, symbol, period
+            )
+    
     async def generate_explanation(
         self,
         strategy_name: str,
