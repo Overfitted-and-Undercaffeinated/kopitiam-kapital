@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Dict
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 # Load environment variables from project root
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -308,6 +309,93 @@ async def orchestrate_request(request: OrchestrateRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to orchestrate request: {str(e)}"
+        )
+
+@app.post("/assistant/chat")
+async def assistant_chat(
+    message: str,
+    user_id: str,
+    user_context: Dict = None
+):
+    """
+    Unified chat interface for the AI assistant
+    
+    Intelligently routes user messages to appropriate functions:
+    - Backtest (with natural language strategy)
+    - Recommendations
+    - Sentiment Analysis
+    - Research
+    - Explanations
+    - Portfolio
+    
+    Args:
+        message: User's natural language message
+        user_id: User ID
+        user_context: Optional user context
+    
+    Returns:
+        {
+            "short_response": str,  # Spoken response
+            "detailed_response": str,  # Full text response with TL;DR
+            "metadata": {  # Additional data
+                "chart_data": [...],  # For PnL charts
+                "symbols": [...],
+                ...
+            },
+            "intent": str  # Detected intent
+        }
+    
+    Examples:
+        - "backtest mean reversion on AAPL"
+        - "apply RSI strategy to AAPL, TSLA, NVDA"
+        - "should I buy Microsoft?"
+        - "what's the sentiment on tech stocks?"
+        - "what is RSI?"
+    """
+    try:
+        from agents.chat_orchestrator import chat_orchestrator
+        
+        logger.info(f"Chat message from user {user_id}: '{message[:100]}...'")
+        
+        result = await chat_orchestrator.handle_message(
+            message=message,
+            user_id=user_id,
+            user_context=user_context
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Chat assistant error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process chat message: {str(e)}"
+        )
+
+@app.post("/assistant/debug-nlp")
+async def debug_nlp(message: str):
+    """
+    Debug endpoint to test NLP intent detection
+    """
+    try:
+        from agents.chat_orchestrator import chat_orchestrator
+        
+        logger.info(f"Debug NLP for message: '{message}'")
+        
+        # Test the analysis directly
+        analysis = await chat_orchestrator._analyze_message(message)
+        
+        return {
+            "message": message,
+            "analysis": analysis,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"NLP debug error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to debug NLP: {str(e)}"
         )
 
 @app.post("/ai/recommend")
