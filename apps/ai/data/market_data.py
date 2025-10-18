@@ -90,6 +90,12 @@ class MarketDataService:
         if settings.use_mock_market_data:
             return self._mock_ohlcv(symbol, period)
         
+        # Try direct API call first (bypass yfinance library issues)
+        try:
+            return await self._direct_api_call(symbol, period)
+        except Exception as e:
+            logger.warning(f"Direct API call failed: {e}, falling back to yfinance")
+        
         # Define fetch function for cache
         async def fetch_data():
             try:
@@ -157,10 +163,10 @@ class MarketDataService:
     def _period_to_days(self, period: str) -> int:
         """Convert period string to number of days"""
         mapping = {
-            "1d": 1, "5d": 5, "1mo": 30, "3mo": 90,
+            "1d": 1, "5d": 5, "1mo": 60, "3mo": 90,  # Use 60 days for 1mo to ensure enough data
             "6mo": 180, "1y": 365, "2y": 730, "5y": 1825
         }
-        return mapping.get(period, 30)
+        return mapping.get(period, 60)  # Default to 60 days
     
     def _mock_price(self, symbol: str) -> float:
         """Generate mock price for testing"""
@@ -201,6 +207,77 @@ class MarketDataService:
         data['Low'] = data[['Open', 'Low', 'Close']].min(axis=1)
         
         return data
+    
+    async def _direct_api_call(self, symbol: str, period: str) -> Optional[pd.DataFrame]:
+        """Direct API call to Yahoo Finance to bypass yfinance library issues"""
+        import aiohttp
+        import json
+        
+        # Convert period to range parameter
+        range_map = {
+            '1d': '1d',
+            '5d': '5d', 
+            '1mo': '1mo',
+            '3mo': '3mo',
+            '6mo': '6mo',
+            '1y': '1y',
+            '2y': '2y',
+            'max': 'max'
+        }
+        range_param = range_map.get(period, '1mo')
+        
+        url = f'https://query2.finance.yahoo.com/v8/finance/chart/{symbol}'
+        params = {
+            'range': range_param,
+            'interval': '1d',
+            'includePrePost': 'false',
+            'useYfid': 'true',
+            'corsDomain': 'finance.yahoo.com'
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers, timeout=10) as response:
+                if response.status != 200:
+                    raise Exception(f"API returned status {response.status}")
+                
+                data = await response.json()
+                
+                # Parse the response
+                if 'chart' not in data or 'result' not in data['chart']:
+                    raise Exception("Invalid API response format")
+                
+                result = data['chart']['result'][0]
+                
+                if 'timestamp' not in result:
+                    raise Exception("No timestamp data in response")
+                
+                timestamps = result['timestamp']
+                quotes = result['indicators']['quote'][0]
+                
+                # Convert to DataFrame
+                df_data = {
+                    'Open': quotes['open'],
+                    'High': quotes['high'], 
+                    'Low': quotes['low'],
+                    'Close': quotes['close'],
+                    'Volume': quotes['volume']
+                }
+                
+                # Convert timestamps to datetime
+                import pandas as pd
+                dates = pd.to_datetime(timestamps, unit='s')
+                
+                df = pd.DataFrame(df_data, index=dates)
+                
+                # Remove null rows
+                df = df.dropna()
+                
+                logger.info(f"Direct API call successful: {len(df)} days for {symbol}")
+                return df
     
     def _mock_intraday(self, symbol: str, interval: str, days_back: int) -> pd.DataFrame:
         """Generate mock intraday data"""
