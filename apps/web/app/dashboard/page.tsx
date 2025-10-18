@@ -281,30 +281,17 @@ export default function DashboardPage() {
                 Your AI-powered trading companion
               </p>
             </div>
-            <div className="flex gap-3">
-              <motion.button
-                onClick={() => setShowMorningBrief(true)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-4 py-2 bg-[#8B7355] text-white rounded-lg text-sm font-medium hover:bg-[#6F5D47] transition-colors"
-              >
-                Morning Brief
-              </motion.button>
-              <motion.button
-                onClick={() => setShowEODBrief(true)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-4 py-2 bg-white text-[#2F1810] rounded-lg text-sm font-medium hover:bg-[#F5F5F4] transition-colors border border-[#E5E5E5]"
-              >
-                EOD Report
-              </motion.button>
+            <div className="flex items-center">
               <motion.a
                 href="/assistant"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-4 py-2 bg-gradient-to-r from-[#CD853F] to-[#D2691E] text-white rounded-lg text-sm font-medium hover:from-[#D2691E] hover:to-[#8B4513] transition-all shadow-md"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 bg-[#8B4513] text-white rounded-2xl text-lg font-bold hover:bg-[#A0522D] transition-all shadow-xl"
               >
-                🤠 Ask Kopi
+                <span className="flex items-center gap-2">
+                  🤠 Ask Kopi
+                  <span className="text-sm opacity-80">→</span>
+                </span>
               </motion.a>
             </div>
           </div>
@@ -702,33 +689,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Welcome Sequence - Shows while loading */}
-      {showWelcomeSequence && !welcomeComplete && (
-        <WelcomeSequence
-          userName={user?.name || 'Partner'}
-          isDataLoaded={!isLoading && rawMorningData !== null}
-          onComplete={() => {
-            setWelcomeComplete(true)
-            setShowWelcomeSequence(false)
-          }}
-        />
-      )}
+      <WelcomeSequence
+        userName={user?.name || 'Partner'}
+        isDataLoaded={!isLoading && rawMorningData !== null}
+        onComplete={() => {
+          setWelcomeComplete(true)
+          setShowWelcomeSequence(false)
+        }}
+        onSkip={() => {
+          setShowMorningBrief(false)
+        }}
+        show={showWelcomeSequence && !welcomeComplete}
+      />
       
-      {/* Debug info - remove this later */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed top-4 left-4 bg-black text-white p-2 text-xs z-[999]">
-          <div>User Loading: {userLoading ? 'Yes' : 'No'}</div>
-          <div>User: {user ? user.name : 'None'}</div>
-          <div>Error: {userError || 'None'}</div>
-          <div className="mt-2">
-            <button 
-              onClick={() => window.location.href = '/login?redirectTo=/dashboard'}
-              className="bg-red-600 px-2 py-1 rounded text-xs"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Brief Overlays - Only show after welcome sequence */}
       {welcomeComplete && (

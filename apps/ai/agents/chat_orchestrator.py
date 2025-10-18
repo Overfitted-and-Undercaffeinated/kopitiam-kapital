@@ -424,7 +424,7 @@ class ChatOrchestratorAgent:
         try:
             # Set default time period (2 years) and capital ($100k)
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=730)
+            start_date = end_date - timedelta(days=730)  # 2 years
             initial_capital = 100000.0
             
             logger.info(f"Backtesting {len(symbols)} symbol(s): {symbols}")
@@ -499,10 +499,26 @@ class ChatOrchestratorAgent:
                 
                 # Collect chart data
                 if 'visuals' in backtest_result and 'equity_curve' in backtest_result['visuals']:
+                    # Convert NumPy types to regular Python types for JSON serialization
+                    equity_curve = []
+                    for point in backtest_result['visuals']['equity_curve']:
+                        equity_curve.append({
+                            'date': point['date'],
+                            'equity': float(point['equity']),  # Convert np.float64 to float
+                            'trade_pnl': float(point['trade_pnl']) if point['trade_pnl'] is not None else 0
+                        })
+                    
+                    # Convert backtest result metrics to regular Python types
+                    converted_backtest_result = backtest_result.copy()
+                    for key in ['total_return', 'total_return_pct', 'win_rate', 'sharpe_ratio', 
+                               'max_drawdown', 'profit_factor', 'avg_win', 'avg_loss']:
+                        if key in converted_backtest_result:
+                            converted_backtest_result[key] = float(converted_backtest_result[key])
+                    
                     all_chart_data.append({
                         'symbol': symbol,
-                        'equity_curve': backtest_result['visuals']['equity_curve'],
-                        'backtest_result': backtest_result  # Include full backtest result for metrics
+                        'equity_curve': equity_curve,
+                        'backtest_result': converted_backtest_result
                     })
             
             # Combine narratives

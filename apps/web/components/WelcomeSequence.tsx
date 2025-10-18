@@ -6,18 +6,23 @@ import dynamic from 'next/dynamic'
 
 const KopiColt2D = dynamic(
   () => import('../app/onboarding/components/KopiColt2D'),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => <div className="w-80 h-80 flex items-center justify-center text-[#8B4513]">Loading...</div>
+  }
 )
 
 interface WelcomeSequenceProps {
   userName: string | null
   isDataLoaded: boolean
   onComplete: () => void
+  onSkip?: () => void
+  show?: boolean
 }
 
 type SequenceStage = 'welcome' | 'but-first' | 'kopi-appears' | 'kopi-speaks' | 'continue-button' | 'waiting' | 'animating-out'
 
-export default function WelcomeSequence({ userName, isDataLoaded, onComplete }: WelcomeSequenceProps) {
+export default function WelcomeSequence({ userName, isDataLoaded, onComplete, onSkip, show = true }: WelcomeSequenceProps) {
   const [stage, setStage] = useState<SequenceStage>('welcome')
   const [showKopi, setShowKopi] = useState(false)
   const [kopiExpression, setKopiExpression] = useState<'neutral' | 'happy' | 'impressed'>('happy')
@@ -145,6 +150,26 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete }: 
     }
   }
 
+  const handleSkip = () => {
+    // Stop audio
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setIsPlayingAudio(false)
+    
+    // Call onSkip callback if provided
+    if (onSkip) {
+      onSkip()
+    }
+    
+    // Skip directly to completion without waiting for data
+    setStage('animating-out')
+    setTimeout(() => {
+      onComplete()
+    }, 1200)
+  }
+
   // Poll for data when waiting
   useEffect(() => {
     if (isWaitingForData && isDataLoaded) {
@@ -168,7 +193,8 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete }: 
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] bg-white">
+      {show && (
+        <div className="fixed inset-0 z-[100] bg-white">
         {/* Stage 1: Welcome Back */}
         <AnimatePresence>
           {stage === 'welcome' && (
@@ -228,7 +254,7 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete }: 
                 transition={{ duration: 0.6 }}
               >
                 <KopiColt2D
-                  key={`kopi-${stage}`}
+                  key="kopi-welcome"
                   expression={kopiExpression}
                   step={0}
                   isIntro={true}
@@ -240,21 +266,31 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete }: 
               </motion.div>
 
 
-              {/* Continue button */}
+              {/* Continue and Skip buttons */}
               {showContinueButton && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="absolute bottom-20 left-1/2 transform -translate-x-1/2"
                 >
-                  <motion.button
-                    onClick={handleContinue}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-12 py-4 rounded-xl text-xl font-bold text-white bg-[#8B4513] hover:bg-[#6F4E37] transition-all shadow-lg"
-                  >
-                    Continue →
-                  </motion.button>
+                  <div className="flex gap-4 items-center">
+                    <motion.button
+                      onClick={handleContinue}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-12 py-4 rounded-xl text-xl font-bold text-white bg-[#8B4513] hover:bg-[#6F4E37] transition-all shadow-lg"
+                    >
+                      Continue →
+                    </motion.button>
+                    <motion.button
+                      onClick={handleSkip}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-8 py-4 rounded-xl text-lg font-medium text-[#8B4513] bg-white hover:bg-gray-50 transition-all shadow-lg border-2 border-[#8B4513]"
+                    >
+                      Skip
+                    </motion.button>
+                  </div>
                 </motion.div>
               )}
 
@@ -280,7 +316,8 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete }: 
             </div>
           )}
         </AnimatePresence>
-      </div>
+        </div>
+      )}
     </AnimatePresence>
   )
 }

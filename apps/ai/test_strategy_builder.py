@@ -99,7 +99,7 @@ async def test_strategy_backtest(strategies):
     
     # Backtest parameters
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')  # 1 year
+    start_date = (datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')  # 2 years
     initial_capital = 100000.0
     
     print(f"\nBacktest Period: {start_date} to {end_date}")

@@ -12,7 +12,7 @@ try:
     from ..retrievers.exa_client import exa_client
     from ..data.market_data import market_data_service
     from ..rag.pipeline import rag_pipeline
-    from ..utils.clients import get_openai_client
+    from ..utils.clients import get_groq_client
     from ..utils.cost_tracker import cost_tracker
     from ..utils.disclaimers import add_disclaimer_to_brief
     from ..voice.brief_narrator import brief_narrator
@@ -21,7 +21,7 @@ except ImportError:
     from retrievers.exa_client import exa_client
     from data.market_data import market_data_service
     from rag.pipeline import rag_pipeline
-    from utils.clients import get_openai_client
+    from utils.clients import get_groq_client
     from utils.cost_tracker import cost_tracker
     from utils.disclaimers import add_disclaimer_to_brief
     from voice.brief_narrator import brief_narrator
@@ -42,8 +42,8 @@ class EODBriefAgent:
     """
     
     def __init__(self):
-        self.client = get_openai_client()
-        self.model = "gpt-4o-mini"
+        self.client = get_groq_client()
+        self.model = "llama-3.3-70b-versatile"
         logger.info("Initialized EOD Brief Agent")
     
     async def generate_brief(

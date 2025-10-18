@@ -32,6 +32,7 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
+  const [hasPlayedDefaultIntro, setHasPlayedDefaultIntro] = useState(false)
 
   // Enable audio immediately when component mounts
   useEffect(() => {
@@ -69,13 +70,17 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
         setPosition({ bottom: centerY, right: window.innerWidth - centerX - 400 })
       }, 300)
       
-      // Show greeting (only if no custom voice text is provided)
-      if (!customVoiceText) {
+      // Show greeting (only if no custom voice text is provided and we haven't played default intro yet)
+      if (!customVoiceText && !hasPlayedDefaultIntro) {
+        console.log('Playing default intro voice')
+        setHasPlayedDefaultIntro(true)
         setTimeout(() => {
           setVoiceText("Howdy, partner!")
           const introText = "Howdy, partner! Welcome to Kopitiam Capital!"
           playVoice(introText)
         }, 800)
+      } else if (customVoiceText) {
+        console.log('Custom voice text provided, skipping default intro:', customVoiceText)
       }
       
       // Move to corner and shrink after 3 seconds (only if not custom voice)
@@ -105,7 +110,9 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
 
   // Handle custom voice text changes
   useEffect(() => {
+    console.log('Custom voice effect triggered:', { customVoiceText, isVisible, audioEnabled })
     if (customVoiceText && isVisible && audioEnabled) {
+      console.log('Playing custom voice:', customVoiceText)
       setVoiceText(customVoiceText)
       playVoice(customVoiceText)
     }
@@ -606,6 +613,7 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
       </motion.div>
 
       {/* Speech Bubble */}
+      {console.log('Rendering speech bubble:', voiceText)}
       {voiceText && (
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}

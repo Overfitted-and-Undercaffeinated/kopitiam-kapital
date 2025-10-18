@@ -13,6 +13,10 @@ const BacktestCharacterScene = dynamic(() => import('../backtest/components/Back
   ssr: false,
 })
 
+  const ThreeScene = dynamic(() => import('../components/ThreeScene'), {
+  ssr: false,
+})
+
 interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -253,50 +257,121 @@ export default function AssistantPage() {
           top: 50% !important;
           transform: translate(-50%, -50%) !important;
         }
+        
+        /* Cowboy theme animations */
+        @keyframes tumbleweed {
+          0% { transform: translateX(-100px) rotate(0deg); }
+          100% { transform: translateX(calc(100vw + 100px)) rotate(360deg); }
+        }
+        
+        @keyframes dustParticle {
+          0% { opacity: 0; transform: translateY(0px) scale(0.5); }
+          50% { opacity: 1; transform: translateY(-20px) scale(1); }
+          100% { opacity: 0; transform: translateY(-40px) scale(0.5); }
+        }
+        
+        @keyframes spurJingle {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(5deg); }
+          75% { transform: rotate(-5deg); }
+        }
+        
+        .tumbleweed {
+          animation: tumbleweed 20s linear infinite;
+        }
+        
+        .dust-particle {
+          animation: dustParticle 3s ease-out infinite;
+        }
+        
+        .spur-jingle {
+          animation: spurJingle 0.5s ease-in-out;
+        }
       `}</style>
+      
+      {/* 3D Background Scene */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <ThreeScene />
+      </div>
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-[#E5E5E5]">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b-2 border-[#8B4513] shadow-lg">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-[#2F1810]">
-                Ask Kopi Colt
-              </h1>
-              <p className="text-sm text-[#6B5D52] mt-0.5">
-                Your AI trading companion
-              </p>
+            <div className="flex items-center gap-3">
+              <motion.div
+                whileHover={{ rotate: 10 }}
+                className="text-3xl"
+              >
+                🤠
+              </motion.div>
+              <div>
+                <h1 className="text-2xl font-bold text-[#2F1810] flex items-center gap-2">
+                  Ask Kopi Colt
+                  <motion.span
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="text-lg"
+                  >
+                    ⭐
+                  </motion.span>
+                </h1>
+                <p className="text-sm text-[#6B5D52] mt-0.5 flex items-center gap-1">
+                  <span>Your AI trading companion</span>
+                  <motion.span
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    🚀
+                  </motion.span>
+                </p>
+              </div>
             </div>
             <motion.a
               href="/dashboard"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="px-4 py-2 bg-[#8B7355] text-white rounded-lg text-sm font-medium hover:bg-[#6F5D47] transition-colors"
+              whileHover={{ scale: 1.05, rotate: 2 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-6 py-3 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white rounded-xl text-sm font-bold hover:from-[#A0522D] hover:to-[#8B4513] transition-all shadow-lg border-2 border-white/20 spur-jingle"
             >
-              Back to Dashboard
+              <span className="flex items-center gap-2">
+                🏠 Back to Dashboard
+              </span>
             </motion.a>
           </div>
         </div>
       </header>
 
       {/* Quick Access Navigation */}
-      <div className="bg-white/90 backdrop-blur-sm border-b border-[#E5E5E5]">
+      <div className="bg-white/90 backdrop-blur-sm border-b-2 border-[#8B4513] shadow-md">
         <div className="container mx-auto px-6">
-          <div className="flex gap-1 overflow-x-auto py-2">
-            <a href="/sentiment" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
-              📊 Sentiment
-            </a>
-            <a href="/backtest" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
-              📈 Backtest
-            </a>
-            <a href="/alerts" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
-              🔔 Alerts
-            </a>
-            <a href="/analysis" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
-              📄 Analysis
-            </a>
-            <a href="/portfolio" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
-              💼 Portfolio
-            </a>
+          <div className="flex gap-2 overflow-x-auto py-3">
+            {[
+              { href: '/sentiment', icon: '📊', label: 'Sentiment', color: 'from-blue-500 to-blue-600' },
+              { href: '/backtest', icon: '📈', label: 'Backtest', color: 'from-green-500 to-green-600' },
+              { href: '/alerts', icon: '🔔', label: 'Alerts', color: 'from-orange-500 to-orange-600' },
+              { href: '/analysis', icon: '📄', label: 'Analysis', color: 'from-purple-500 to-purple-600' },
+              { href: '/portfolio', icon: '💼', label: 'Portfolio', color: 'from-amber-500 to-amber-600' }
+            ].map((item, index) => (
+              <motion.a
+                key={item.href}
+                href={item.href}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className={`px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r ${item.color} hover:shadow-lg transition-all whitespace-nowrap border-2 border-white/20`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <span className="flex items-center gap-2">
+                  <motion.span
+                    whileHover={{ rotate: 360 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    {item.icon}
+                  </motion.span>
+                  {item.label}
+                </span>
+              </motion.a>
+            ))}
           </div>
         </div>
       </div>
@@ -353,7 +428,12 @@ export default function AssistantPage() {
           </div>
 
           {/* Chat Interface - Right Side */}
-          <div className="lg:col-span-2 flex flex-col bg-white rounded-lg shadow-xl border border-[#E5E5E5] overflow-hidden">
+          <div className="lg:col-span-2 flex flex-col bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-[#8B4513]/20 overflow-hidden relative">
+            {/* Decorative Elements */}
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#8B4513] via-[#A0522D] to-[#8B4513]" />
+            <div className="absolute top-2 left-4 w-3 h-3 bg-[#8B4513] rounded-full" />
+            <div className="absolute top-2 left-8 w-2 h-2 bg-[#A0522D] rounded-full" />
+            <div className="absolute top-2 left-12 w-2 h-2 bg-[#8B4513] rounded-full" />
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.length === 0 && (
@@ -362,28 +442,63 @@ export default function AssistantPage() {
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.2 }}
+                    className="relative"
                   >
-                    <h3 className="text-3xl font-bold text-[#2F1810] mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
-                      Howdy, {userName}! 🤠
+                    {/* Cowboy Hat Decoration */}
+                    <motion.div
+                      className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-4xl"
+                      animate={{ rotate: [0, 5, -5, 0] }}
+                      transition={{ duration: 3, repeat: Infinity }}
+                    >
+                      🤠
+                    </motion.div>
+                    
+                    <h3 className="text-4xl font-bold text-[#2F1810] mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
+                      Howdy, {userName}!
                     </h3>
-                    <p className="text-lg text-[#6B5D52] mb-6">
+                    <p className="text-xl text-[#6B5D52] mb-8">
                       Ask me anything about the markets, your portfolio, or trading ideas!
                     </p>
-                    <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto">
+                    
+                    {/* Decorative Border */}
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#8B4513] to-transparent" />
+                      <motion.span
+                        className="mx-4 text-2xl"
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        ⭐
+                      </motion.span>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#8B4513] to-transparent" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                       {[
-                        'Should I buy DBS?',
-                        'How\'s my portfolio doing?',
-                        'What\'s the market outlook?',
-                        'Tell me about Apple stock'
-                      ].map((suggestion) => (
+                        { text: 'Should I buy DBS?', icon: '📈', color: 'from-green-500 to-green-600' },
+                        { text: 'How\'s my portfolio doing?', icon: '💼', color: 'from-blue-500 to-blue-600' },
+                        { text: 'What\'s the market outlook?', icon: '📊', color: 'from-purple-500 to-purple-600' },
+                        { text: 'Tell me about Apple stock', icon: '🍎', color: 'from-red-500 to-red-600' }
+                      ].map((suggestion, index) => (
                         <motion.button
-                          key={suggestion}
-                          onClick={() => setInputText(suggestion)}
-                          whileHover={{ scale: 1.02, y: -2 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="px-4 py-3 bg-[#FAFAF9] hover:bg-[#F5F5F4] rounded-lg text-sm font-medium text-[#2F1810] border border-[#E5E5E5] transition-colors"
+                          key={suggestion.text}
+                          onClick={() => setInputText(suggestion.text)}
+                          whileHover={{ scale: 1.05, y: -3, rotate: 1 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={`px-6 py-4 bg-gradient-to-r ${suggestion.color} text-white rounded-xl text-sm font-bold shadow-lg hover:shadow-xl transition-all border-2 border-white/20`}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 + index * 0.1 }}
                         >
-                          {suggestion}
+                          <span className="flex items-center gap-2">
+                            <motion.span
+                              whileHover={{ rotate: 360 }}
+                              transition={{ duration: 0.5 }}
+                            >
+                              {suggestion.icon}
+                            </motion.span>
+                            {suggestion.text}
+                          </span>
                         </motion.button>
                       ))}
                     </div>
@@ -500,20 +615,25 @@ export default function AssistantPage() {
             </div>
 
             {/* Input Area */}
-            <div className="border-t border-[#E5E5E5] p-4 bg-[#FAFAF9]">
-              <div className="flex gap-3">
+            <div className="border-t-2 border-[#8B4513]/20 p-6 bg-gradient-to-r from-[#FAFAF9] to-[#F5F5F4]">
+              <div className="flex gap-4">
                 <motion.button
                   onClick={isListening ? stopListening : startListening}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`p-4 rounded-xl font-bold transition-all ${
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  whileTap={{ scale: 0.9 }}
+                  className={`p-4 rounded-2xl font-bold transition-all shadow-lg ${
                     isListening
-                      ? 'bg-red-500 text-white animate-pulse'
-                      : 'bg-white text-[#8B7355] border border-[#E5E5E5] hover:border-[#8B7355]'
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse border-2 border-red-400'
+                      : 'bg-gradient-to-r from-white to-gray-50 text-[#8B7355] border-2 border-[#8B4513] hover:border-red-500 hover:text-red-600'
                   }`}
                   disabled={isProcessing || isSpeaking}
                 >
-                  {isListening ? '🎤 Listening...' : '🎤'}
+                  <motion.span
+                    animate={isListening ? { scale: [1, 1.2, 1] } : {}}
+                    transition={{ duration: 0.5, repeat: isListening ? Infinity : 0 }}
+                  >
+                    {isListening ? '🎤 Listening...' : '🎤'}
+                  </motion.span>
                 </motion.button>
 
                 <input
@@ -523,22 +643,52 @@ export default function AssistantPage() {
                   onKeyPress={handleKeyPress}
                   placeholder="Type your question or use voice..."
                   disabled={isProcessing || isSpeaking}
-                  className="flex-1 px-5 py-4 rounded-xl border border-[#E5E5E5] bg-white text-[#2F1810] font-medium focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/20 transition-all disabled:opacity-50"
+                  className="flex-1 px-6 py-4 rounded-2xl border-2 border-[#8B4513]/30 bg-white text-[#2F1810] font-medium focus:outline-none focus:border-[#8B7355] focus:ring-4 focus:ring-[#8B7355]/20 transition-all disabled:opacity-50 shadow-lg"
                 />
 
                 <motion.button
                   onClick={handleSendMessage}
-                  whileHover={{ scale: 1.05 }}
+                  whileHover={{ scale: 1.05, rotate: 2 }}
                   whileTap={{ scale: 0.95 }}
                   disabled={!inputText.trim() || isProcessing || isSpeaking}
-                  className="px-6 py-4 rounded-xl bg-[#8B7355] text-white font-bold hover:bg-[#6F5D47] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-8 py-4 rounded-2xl bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-bold hover:from-[#A0522D] hover:to-[#8B4513] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg border-2 border-white/20"
                 >
-                  {isProcessing ? '...' : 'Send'}
+                  <span className="flex items-center gap-2">
+                    {isProcessing ? (
+                      <>
+                        <motion.span
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        >
+                          ⚡
+                        </motion.span>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        🚀 Send
+                      </>
+                    )}
+                  </span>
                 </motion.button>
               </div>
-              <p className="text-xs text-[#6B5D52] mt-2 text-center">
-                Press Enter to send • Click 🎤 to use voice input
-              </p>
+              <div className="flex items-center justify-center mt-3">
+                <div className="flex items-center gap-2 text-xs text-[#6B5D52]">
+                  <motion.span
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    ⭐
+                  </motion.span>
+                  Press Enter to send • Click 🎤 to use voice input
+                  <motion.span
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                  >
+                    ⭐
+                  </motion.span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

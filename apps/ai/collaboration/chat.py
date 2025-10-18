@@ -8,11 +8,11 @@ import re
 
 # Flexible imports
 try:
-    from ..utils.clients import get_openai_client
+    from ..utils.clients import get_groq_client
     from ..sentiment.aggregator import sentiment_aggregator
     from ..utils.cost_tracker import cost_tracker
 except ImportError:
-    from utils.clients import get_openai_client
+    from utils.clients import get_groq_client
     from sentiment.aggregator import sentiment_aggregator
     from utils.cost_tracker import cost_tracker
 
@@ -46,8 +46,8 @@ class ChatAIAgent:
     """
     
     def __init__(self):
-        self.client = get_openai_client()
-        self.model = "gpt-4o-mini"  # Fast and cheap for chat
+        self.client = get_groq_client()
+        self.model = "llama-3.3-70b-versatile"  # Fast and cheap for chat
         
         # Store recent chat history per workspace
         self.chat_history: Dict[str, List[Dict]] = {}
