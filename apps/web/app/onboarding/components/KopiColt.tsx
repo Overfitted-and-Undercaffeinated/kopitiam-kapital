@@ -164,7 +164,13 @@ export default function KopiColt({ expression, cursorPosition, step, isIntro, on
     } catch (error: any) {
       console.error('❌ Voice error:', error.message || error)
       // Fallback: just show text without audio
-      setTimeout(() => setVoiceText(''), 4000)
+      setTimeout(() => {
+        setVoiceText('')
+        // If this is the intro voice, trigger form to appear even if audio fails
+        if (text.includes("Howdy, partner!") && onIntroComplete) {
+          onIntroComplete()
+        }
+      }, 2000) // Show form after 2 seconds if voice fails
     }
   }
 
