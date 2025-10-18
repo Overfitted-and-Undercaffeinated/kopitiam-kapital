@@ -189,7 +189,7 @@ class RecommendationAgent:
                 return self._default_backtest_result()
             
             # Build strategy function  
-            strategy_func = strategy_builder.build_strategy(strategy_def)
+            strategy_func = await strategy_builder.build_strategy(strategy_def)
             
             # Run backtest
             from datetime import timedelta
