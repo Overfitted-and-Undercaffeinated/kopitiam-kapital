@@ -31,6 +31,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief }: BriefOver
   const isMorning = type === 'morning'
   const [currentSection, setCurrentSection] = useState(0)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Define sections with their content and narration
@@ -142,6 +143,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief }: BriefOver
   useEffect(() => {
     if (isOpen) {
       setCurrentSection(0)
+      setIsClosing(false)
     } else {
       // IMMEDIATELY stop audio when closing
       if (audioRef.current) {
@@ -240,7 +242,15 @@ export default function BriefOverlay({ isOpen, onClose, type, brief }: BriefOver
       audioRef.current = null
     }
     setIsPlayingAudio(false)
-    onClose()
+    
+    // Trigger Kopi's exit animation
+    setIsClosing(true)
+    
+    // Wait for animation to complete before actually closing
+    setTimeout(() => {
+      setIsClosing(false)
+      onClose()
+    }, 1200) // Animation duration
   }
 
   const getKopiExpression = () => {
@@ -256,23 +266,46 @@ export default function BriefOverlay({ isOpen, onClose, type, brief }: BriefOver
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - blur layer behind everything */}
           <motion.div
-            className="fixed inset-0 bg-[#2F1810]/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-[#2F1810]/60 backdrop-blur-sm z-40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
           />
 
-          {/* Kopi Colt Character */}
-          <KopiColt2D
-            expression={getKopiExpression()}
-            step={currentSection}
-            isIntro={false}
-          />
+          {/* Kopi Colt Character - ON TOP of blur, crisp and clear! */}
+          <div className="z-50" style={{ pointerEvents: 'none' }}>
+            <motion.div
+              initial={{ y: 0, x: 0, opacity: 1, rotate: 0 }}
+              animate={isClosing ? {
+                y: -1000,
+                x: 200,
+                opacity: 0,
+                rotate: -15,
+                scale: 0.8
+              } : {
+                y: 0,
+                x: 0,
+                opacity: 1,
+                rotate: 0,
+                scale: 1
+              }}
+              transition={{
+                duration: 1.2,
+                ease: [0.6, 0.05, 0.01, 0.9]
+              }}
+            >
+              <KopiColt2D
+                expression={isClosing ? 'happy' : getKopiExpression()}
+                step={currentSection}
+                isIntro={false}
+              />
+            </motion.div>
+          </div>
 
-          {/* Content Card */}
+          {/* Content Card - same level as Kopi */}
           <motion.div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             initial={{ opacity: 0 }}
@@ -282,7 +315,15 @@ export default function BriefOverlay({ isOpen, onClose, type, brief }: BriefOver
             <motion.div
               className="max-w-2xl w-full max-h-[70vh] overflow-y-auto rounded-lg shadow-2xl bg-white border border-[#E5E5E5] pointer-events-auto"
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
+              animate={isClosing ? {
+                scale: 0.9,
+                opacity: 0,
+                y: 50
+              } : {
+                scale: 1,
+                opacity: 1,
+                y: 0
+              }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             >

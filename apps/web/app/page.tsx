@@ -1428,15 +1428,26 @@ export default function Home() {
               <p className="text-3xl text-[#FFE4B5] mb-12 font-semibold">
                 Join Kopitiam Capital and start making informed trading decisions
               </p>
-              <motion.a
-                href="/onboarding"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="inline-block bg-[#FFF8DC] text-[#2F1810] px-16 py-8 rounded-2xl text-3xl font-bold transition-all"
-                style={{ fontFamily: 'var(--font-heading)' }}
-              >
-                Get Started →
-              </motion.a>
+              <div className="flex flex-col sm:flex-row gap-6 items-center justify-center">
+                <motion.a
+                  href="/onboarding"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="inline-block bg-[#FFF8DC] text-[#2F1810] px-16 py-8 rounded-2xl text-3xl font-bold transition-all shadow-2xl"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  Get Started →
+                </motion.a>
+                <motion.a
+                  href="/assistant"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="inline-block bg-gradient-to-r from-[#CD853F] to-[#D2691E] text-white px-12 py-6 rounded-2xl text-2xl font-bold transition-all shadow-xl border-4 border-[#FFF8DC]"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  🤠 Try Kopi Now
+                </motion.a>
+              </div>
         </div>
           </AnimatedSection>
         </section>

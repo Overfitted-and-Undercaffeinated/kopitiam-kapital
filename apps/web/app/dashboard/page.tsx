@@ -180,6 +180,14 @@ export default function DashboardPage() {
               >
                 EOD Report
               </motion.button>
+              <motion.a
+                href="/assistant"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="px-4 py-2 bg-gradient-to-r from-[#CD853F] to-[#D2691E] text-white rounded-lg text-sm font-medium hover:from-[#D2691E] hover:to-[#8B4513] transition-all shadow-md"
+              >
+                🤠 Ask Kopi
+              </motion.a>
             </div>
           </div>
         </div>
