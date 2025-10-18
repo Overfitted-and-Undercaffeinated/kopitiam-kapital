@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str
     alpha_vantage_api_key: Optional[str] = None
     
+    # Reddit API (PRAW)
+    client_id: Optional[str] = None  # Reddit client ID
+    client_secret: Optional[str] = None  # Reddit client secret
+    user_agent: str = "KopitiamCapital/1.0"  # Reddit user agent
+    
     # Supabase
     supabase_url: str
     supabase_service_key: str

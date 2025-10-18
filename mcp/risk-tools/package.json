@@ -1,21 +1,25 @@
 {
-  "name": "@kopitiam/mcp-risk-tools",
+  "name": "@kopitiam-capital/risk-tools-mcp",
   "version": "1.0.0",
+  "description": "MCP server for risk calculations and position sizing",
+  "main": "dist/index.js",
   "type": "module",
-  "bin": {
-    "kopitiam-risk-tools": "./build/server.js"
-  },
   "scripts": {
     "build": "tsc",
-    "watch": "tsc --watch",
-    "start": "node build/server.js"
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts"
   },
+  "keywords": ["mcp", "trading", "risk", "position-sizing"],
+  "author": "Kopitiam Capital",
+  "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0"
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "mathjs": "^12.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "tsx": "^4.0.0",
+    "typescript": "^5.3.0"
   }
 }
-

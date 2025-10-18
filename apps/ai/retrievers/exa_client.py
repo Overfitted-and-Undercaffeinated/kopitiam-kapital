@@ -12,13 +12,11 @@ try:
     from ..utils.rate_limiter import rate_limiter
     from ..utils.cost_tracker import cost_tracker
     from ..utils.resilience import resilient_service
-    from ..rag.cache_strategy import cache_strategy
 except ImportError:
     from utils.config import settings
     from utils.rate_limiter import rate_limiter
     from utils.cost_tracker import cost_tracker
     from utils.resilience import resilient_service
-    from rag.cache_strategy import cache_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +36,7 @@ class ExaClient:
     def __init__(self):
         self.api_key = settings.exa_api_key
         self.client = None
+        self._cache = None  # Lazy load to avoid circular imports
         
         # Initialize client if not in mock mode
         if not settings.use_mock_exa:
@@ -51,6 +50,18 @@ class ExaClient:
             except Exception as e:
                 logger.error(f"Failed to initialize Exa client: {e}")
                 settings.use_mock_exa = True
+    
+    @property
+    def cache(self):
+        """Lazy load cache_strategy to avoid circular imports"""
+        if self._cache is None:
+            try:
+                from ..rag.cache_strategy import cache_strategy
+                self._cache = cache_strategy
+            except ImportError:
+                from rag.cache_strategy import cache_strategy
+                self._cache = cache_strategy
+        return self._cache
     
     async def search_fast(
         self,
