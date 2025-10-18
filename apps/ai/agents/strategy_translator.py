@@ -107,13 +107,19 @@ Entry/Exit rules must specify:
   "risk_management": {"stop_loss_percent": 0.05, "take_profit_percent": 0.10}
 }
 
-**Important Rules:**
-1. Always include reasonable exit rules (opposite of entry or standard profit targets)
-2. Use 10% position sizing as default
-3. Use 5% stop loss and 10% take profit as defaults
-4. For time-based indicators (2 weeks, 1 month), convert to trading days (5 days/week)
-5. Indicator names in rules must match the format: "indicator_period" (e.g., "sma_50", "rsi", "macd")
-6. Be conservative with risk management
+**CRITICAL REQUIREMENTS:**
+1. Strategies MUST generate trades - avoid overly restrictive conditions that might never trigger
+2. For vague descriptions like "mean reversion", use the most common implementation (RSI oversold/overbought)
+3. Avoid combining too many conditions that might never trigger simultaneously
+4. Always include reasonable exit rules (opposite of entry or standard profit targets)
+5. Use 10% position sizing as default
+6. Use 5% stop loss and 10% take profit as defaults
+7. For time-based indicators (2 weeks, 1 month), convert to trading days (5 days/week)
+8. Indicator names in rules must match the format: "indicator_period" (e.g., "sma_50", "rsi", "macd")
+9. Be conservative with risk management
+
+**For "mean reversion" specifically:**
+Use the RSI < 30 / RSI > 70 template (Example 5 above). This is the standard implementation.
 
 Return ONLY valid JSON matching the structure above. No explanations outside the JSON."""
 
@@ -160,6 +166,10 @@ class StrategyTranslatorAgent:
             
             # Parse JSON
             strategy_def = json.loads(strategy_json_str)
+            logger.info(f"Parsed strategy: {strategy_def.get('name')}")
+            
+            # Validate strategy has required fields
+            self._validate_strategy(strategy_def)
             
             # Validate structure
             is_valid, error_msg = strategy_builder.validate_strategy(strategy_def)
@@ -226,6 +236,9 @@ Return only valid JSON."""
             if not content:
                 raise ValueError("Empty response from Groq")
             
+            # ADD: Log raw LLM response
+            logger.info(f"Raw LLM response: {content[:500]}...")  # Log first 500 chars
+            
             return content
             
         except Exception as e:
@@ -234,6 +247,24 @@ Return only valid JSON."""
                 return await self._call_groq(natural_language, symbol, retry=False)
             else:
                 raise
+    
+    def _validate_strategy(self, strategy_def: Dict) -> None:
+        """
+        Validate that strategy has all required fields
+        Raises ValueError if invalid
+        """
+        required_fields = ['name', 'description', 'indicators', 'entry_rules', 'exit_rules']
+        for field in required_fields:
+            if field not in strategy_def:
+                raise ValueError(f"Missing required field: {field}")
+        
+        if not strategy_def['entry_rules']:
+            raise ValueError("Strategy must have at least one entry rule")
+        
+        if not strategy_def['exit_rules']:
+            raise ValueError("Strategy must have at least one exit rule")
+        
+        logger.info(f"Strategy validation passed: {strategy_def['name']}")
     
     def get_example_strategies(self) -> list:
         """

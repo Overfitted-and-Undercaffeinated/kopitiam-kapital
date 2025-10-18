@@ -81,6 +81,9 @@ class BacktestEngine:
             # Filter by date range
             data = data.loc[start_date:end_date]
             
+            # ADD: Log data info
+            logger.info(f"Backtesting {symbol}: {len(data)} days of data")
+            
             # Run strategy
             trades = await self._simulate_trades(data, strategy_fn, initial_capital)
             
@@ -119,6 +122,10 @@ class BacktestEngine:
             
             # Get signal from strategy
             signal = await strategy_fn(window)
+            
+            # ADD: Log when trades are evaluated
+            if signal:
+                logger.info(f"Trade signal generated on {current_date}: {signal}")
             
             if signal and not current_position:
                 # Calculate position size based on signal
@@ -171,6 +178,9 @@ class BacktestEngine:
                     
                     trades.append(current_position)
                     current_position = None
+        
+        # ADD: Log simulation results
+        logger.info(f"Backtest complete: {len(trades)} trades generated")
         
         return trades
     
@@ -280,16 +290,33 @@ class BacktestEngine:
                 'equity': current_equity,
                 'trade_pnl': 0
             })
-        
-        # Add each trade exit
-        for trade in trades:
-            if trade.exit_date and trade.pnl is not None:
-                current_equity += trade.pnl
-                equity_curve.append({
-                    'date': trade.exit_date.isoformat(),
-                    'equity': current_equity,
-                    'trade_pnl': trade.pnl
-                })
+            
+            # Add each trade exit
+            for trade in trades:
+                if trade.exit_date and trade.pnl is not None:
+                    current_equity += trade.pnl
+                    equity_curve.append({
+                        'date': trade.exit_date.isoformat(),
+                        'equity': current_equity,
+                        'trade_pnl': trade.pnl
+                    })
+        else:
+            # No trades - create flat line at initial capital
+            # Use current date for two points to show flat line
+            from datetime import datetime
+            today = datetime.now().isoformat()
+            equity_curve = [
+                {
+                    'date': today,
+                    'equity': initial_capital,
+                    'trade_pnl': 0
+                },
+                {
+                    'date': today,
+                    'equity': initial_capital,
+                    'trade_pnl': 0
+                }
+            ]
         
         return equity_curve
     

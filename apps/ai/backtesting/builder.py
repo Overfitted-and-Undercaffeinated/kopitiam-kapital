@@ -74,11 +74,18 @@ class StrategyBuilder:
             # Add indicators to data
             data = add_indicators_to_dataframe(data, indicators)
             
+            # ADD: Log available indicators
+            logger.debug(f"Available columns after indicators: {data.columns.tolist()}")
+            logger.debug(f"Current row values: {current.to_dict()}")
+            
             # Get current row (latest data point)
             current = data.iloc[-1]
             
             # Check entry rules (we're always looking for new entries in backtest)
             should_enter = self._evaluate_rules(entry_rules, current, data)
+            
+            # ADD: Log rule evaluation results
+            logger.debug(f"Entry rules evaluation: {should_enter}")
             
             if should_enter:
                 entry_price = current['close']

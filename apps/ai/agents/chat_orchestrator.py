@@ -436,6 +436,12 @@ class ChatOrchestratorAgent:
                 symbol=symbols[0]  # Use first symbol as reference
             )
             
+            # ADD: Log the generated strategy for debugging
+            logger.info(f"Generated strategy JSON: {json.dumps(strategy_def, indent=2)}")
+            logger.info(f"Strategy name: {strategy_def.get('name')}")
+            logger.info(f"Entry rules: {strategy_def.get('entry_rules')}")
+            logger.info(f"Exit rules: {strategy_def.get('exit_rules')}")
+            
             # Build strategy function
             strategy_func = await strategy_builder.build_strategy(strategy_def)
             
