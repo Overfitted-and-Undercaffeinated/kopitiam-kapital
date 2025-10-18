@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import models and agents
-from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse
+from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse, OrchestrateRequest
 from agents.router import RouterAgent
 
 # Lifespan handler for startup/shutdown
@@ -223,11 +223,7 @@ async def route_query(request: RouterRequest):
         )
 
 @app.post("/ai/orchestrate")
-async def orchestrate_request(
-    query: str,
-    user_id: str,
-    context: Dict = None
-):
+async def orchestrate_request(request: OrchestrateRequest):
     """
     Orchestrate complete AI workflow
     
@@ -245,9 +241,7 @@ async def orchestrate_request(
     - "Show my portfolio" → PORTFOLIO → Positions + P&L
     
     Args:
-        query: Natural language query
-        user_id: User ID
-        context: Optional context dict
+        request: OrchestrateRequest with query, user_id, and optional context
     
     Returns:
         {
@@ -259,9 +253,9 @@ async def orchestrate_request(
         from agents.orchestrator import orchestrator_agent
         
         result = await orchestrator_agent.handle_request(
-            query=query,
-            user_id=user_id,
-            context=context
+            query=request.query,
+            user_id=request.user_id,
+            context=request.context
         )
         
         return result

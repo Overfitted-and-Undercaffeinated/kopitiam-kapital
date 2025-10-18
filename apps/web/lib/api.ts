@@ -92,3 +92,227 @@ export async function orchestrateRequest(
   return response.json()
 }
 
+/**
+ * Get list of backtest strategy templates
+ */
+export async function getBacktestTemplates() {
+  const response = await fetch(`${API_BASE_URL}/backtest/templates`)
+  
+  if (!response.ok) {
+    throw new Error('Failed to get backtest templates')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Get specific backtest strategy template
+ */
+export async function getBacktestTemplate(templateId: string) {
+  const response = await fetch(`${API_BASE_URL}/backtest/templates/${templateId}`)
+  
+  if (!response.ok) {
+    throw new Error('Failed to get backtest template')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Run a backtest with custom parameters
+ */
+export async function runBacktestDetailed(params: {
+  symbol: string
+  strategy_definition?: any
+  strategy_template_id?: string
+  start_date?: string
+  end_date?: string
+  initial_capital?: number
+}) {
+  const response = await fetch(`${API_BASE_URL}/backtest/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to run backtest')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Check user alerts
+ */
+export async function checkAlerts(userId: string) {
+  const response = await fetch(`${API_BASE_URL}/alerts/check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId }),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to check alerts')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Create a new alert rule
+ */
+export async function createAlert(params: {
+  user_id: string
+  symbol: string
+  alert_type: string
+  condition: any
+}) {
+  const response = await fetch(`${API_BASE_URL}/alerts/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to create alert')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Analyze a long document
+ */
+export async function analyzeLongDocument(params: {
+  text: string
+  document_type: string
+  user_id: string
+  ticker?: string
+}) {
+  const response = await fetch(`${API_BASE_URL}/analysis/long-context`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to analyze document')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Auto-fetch and analyze financial documents
+ */
+export async function autoFetchAndAnalyze(params: {
+  ticker: string
+  user_id: string
+  include_earnings_call?: boolean
+}) {
+  const response = await fetch(`${API_BASE_URL}/analysis/long-context/auto-fetch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to auto-fetch and analyze')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Get explanation of a trading concept
+ */
+export async function explainConcept(params: {
+  topic: string
+  user_id: string
+  level_override?: string
+  category?: string
+}) {
+  const response = await fetch(`${API_BASE_URL}/explain`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to explain concept')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Execute a recommendation (create position)
+ */
+export async function executeRecommendation(params: {
+  user_id: string
+  recommendation_id: string
+  fill_price: number
+  quantity: number
+  notes?: string
+}) {
+  const response = await fetch(`${API_BASE_URL}/portfolio/execute-recommendation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to execute recommendation')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Close a position
+ */
+export async function closePosition(params: {
+  position_id: string
+  close_price: number
+  notes?: string
+}) {
+  const response = await fetch(`${API_BASE_URL}/portfolio/close-position`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to close position')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Get market hours for an exchange
+ */
+export async function getMarketHours(exchange: string) {
+  const response = await fetch(`${API_BASE_URL}/utils/market-hours/${exchange}`)
+  
+  if (!response.ok) {
+    throw new Error('Failed to get market hours')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Get list of currently active markets
+ */
+export async function getActiveMarkets() {
+  const response = await fetch(`${API_BASE_URL}/utils/active-markets`)
+  
+  if (!response.ok) {
+    throw new Error('Failed to get active markets')
+  }
+  
+  return response.json()
+}
+

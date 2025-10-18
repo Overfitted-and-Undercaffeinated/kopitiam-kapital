@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import BriefOverlay from '@/components/BriefOverlay'
+import WelcomeSequence from '@/components/WelcomeSequence'
+import { useUser } from '@/hooks/useUser'
 
 // Dynamically import the cowboy scene
 const CowboyScene = dynamic(
@@ -39,6 +41,49 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [rawMorningData, setRawMorningData] = useState<any>(null)
   const [rawEODData, setRawEODData] = useState<any>(null)
+  const [recommendations, setRecommendations] = useState<any[]>([])
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
+  
+  // Welcome sequence state
+  const [showWelcomeSequence, setShowWelcomeSequence] = useState(true)
+  const [welcomeComplete, setWelcomeComplete] = useState(false)
+  
+  // Use the useUser hook to get authenticated user data
+  const { user, loading: userLoading, error: userError } = useUser()
+  
+  // Debug logging for user data
+  useEffect(() => {
+    console.log('🔍 User hook state:', { user, userLoading, userError })
+    if (user) {
+      console.log('✅ User data loaded:', { name: user.name, email: user.email })
+    }
+  }, [user, userLoading, userError])
+
+  // Check if user is not authenticated and redirect to login
+  useEffect(() => {
+    if (!userLoading && !user && (userError?.includes('User profile not found') || !userError)) {
+      console.log('🚨 No user found, redirecting to login...')
+      window.location.href = '/login?redirectTo=/dashboard'
+    }
+  }, [user, userLoading, userError])
+
+  // Fallback: If useUser hook is taking too long, try direct API call
+  useEffect(() => {
+    if (userLoading && !user) {
+      console.log('⏰ useUser hook taking too long, trying direct API call...')
+      const timeoutId = setTimeout(async () => {
+        try {
+          const response = await fetch('/api/user')
+          const data = await response.json()
+          console.log('🔍 Direct API call result:', data)
+        } catch (error) {
+          console.error('❌ Direct API call failed:', error)
+        }
+      }, 2000) // Try after 2 seconds
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [userLoading, user])
 
   // Track cursor position
   useEffect(() => {
@@ -49,12 +94,15 @@ export default function DashboardPage() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
 
-  // Fetch briefs on mount
+  // Start data fetching immediately on mount (user data handled by useUser hook)
   useEffect(() => {
     const userId = localStorage.getItem('userId') || 'demo_user'
     
     // Try to fetch real briefs from AI backend
     fetchRealBriefs(userId)
+    
+    // Fetch recommendations for watchlist
+    fetchRecommendations(userId, ['NVDA', 'AAPL', 'DBS'])
   }, [])
   
   const fetchRealBriefs = async (userId: string) => {
@@ -167,18 +215,57 @@ export default function DashboardPage() {
     }
   }
 
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="w-12 h-12 border-4 border-[#8B7355] border-t-transparent rounded-full"
-        />
-      </div>
-    )
+  const fetchRecommendations = async (userId: string, symbols: string[]) => {
+    setLoadingRecommendations(true)
+    const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+    
+    try {
+      console.log('=== FETCHING RECOMMENDATIONS ===')
+      console.log('Symbols:', symbols)
+      
+      // Fetch recommendations for each symbol in parallel
+      const recommendationPromises = symbols.map(async (symbol) => {
+        try {
+          const response = await fetch(`${AI_API_URL}/ai/recommend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              symbol,
+              user_id: userId,
+              include_sentiment: true,
+              include_backtest: true
+            }),
+            signal: AbortSignal.timeout(30000) // 30 second timeout per symbol
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`✅ Recommendation for ${symbol}:`, data)
+            return { symbol, ...data, success: true }
+          } else {
+            console.error(`❌ Failed to fetch recommendation for ${symbol}:`, response.status)
+            return { symbol, success: false }
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching recommendation for ${symbol}:`, error)
+          return { symbol, success: false }
+        }
+      })
+      
+      const results = await Promise.all(recommendationPromises)
+      const successfulRecommendations = results.filter(r => r.success)
+      
+      console.log(`✅ Fetched ${successfulRecommendations.length}/${symbols.length} recommendations`)
+      setRecommendations(successfulRecommendations)
+      
+    } catch (error) {
+      console.error('❌ Error fetching recommendations:', error)
+    } finally {
+      setLoadingRecommendations(false)
+      console.log('=== RECOMMENDATION FETCHING COMPLETE ===')
+    }
   }
+
 
   return (
     <div className="min-h-screen bg-[#FAFAF9] relative" style={{ fontFamily: 'var(--font-body)' }}>
@@ -223,6 +310,29 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {/* Quick Access Navigation */}
+      <div className="bg-white border-b border-[#E5E5E5]">
+        <div className="container mx-auto px-6">
+          <div className="flex gap-1 overflow-x-auto py-2">
+            <a href="/sentiment" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📊 Sentiment
+            </a>
+            <a href="/backtest" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📈 Backtest
+            </a>
+            <a href="/alerts" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              🔔 Alerts
+            </a>
+            <a href="/analysis" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📄 Analysis
+            </a>
+            <a href="/portfolio" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-[#FAFAF9] hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              💼 Portfolio
+            </a>
+          </div>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="sticky top-[73px] z-30 bg-white border-b border-[#E5E5E5]">
@@ -277,6 +387,61 @@ export default function DashboardPage() {
               exit={{ opacity: 0 }}
               className="space-y-6"
             >
+              {/* Market Sentiment Summary (if available from briefs) */}
+              {rawMorningData?.sentiment_summary && (
+                <motion.section 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-br from-[#8B7355] to-[#6F5D47] rounded-lg p-6 border border-[#6F5D47] text-white"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      📊 Market Sentiment
+                    </h2>
+                    <div className="text-sm opacity-90">
+                      {rawMorningData.symbols_analyzed?.length || 0} symbols analyzed
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Average Sentiment</div>
+                      <div className="text-3xl font-bold">
+                        {(rawMorningData.sentiment_summary.average_sentiment * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">
+                        {rawMorningData.sentiment_summary.average_sentiment >= 0.55 ? '🟢 Bullish' :
+                         rawMorningData.sentiment_summary.average_sentiment <= 0.45 ? '🔴 Bearish' :
+                         '🟡 Neutral'}
+                      </div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Bullish</div>
+                      <div className="text-3xl font-bold text-green-300">
+                        {rawMorningData.sentiment_summary.bullish_count || 0}
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">stocks</div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Bearish</div>
+                      <div className="text-3xl font-bold text-red-300">
+                        {rawMorningData.sentiment_summary.bearish_count || 0}
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">stocks</div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                      <div className="text-sm opacity-90 mb-1">Trending</div>
+                      <div className="text-3xl font-bold text-blue-300">
+                        {rawMorningData.sentiment_summary.trending_count || 0}
+                      </div>
+                      <div className="text-xs mt-1 opacity-80">mentions</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs opacity-75">
+                    Sources: Exa.ai News, Reddit, StockTwits • Updated: {new Date(rawMorningData.generated_at).toLocaleTimeString()}
+                  </div>
+                </motion.section>
+              )}
+
               {/* Portfolio Overview */}
               <section className="bg-white rounded-lg p-6 border border-[#E5E5E5]">
                 <div className="flex items-center justify-between mb-6">
@@ -360,64 +525,109 @@ export default function DashboardPage() {
 
               {/* Trading Ideas */}
               <section className="bg-white rounded-lg p-6 border border-[#E5E5E5]">
-                <h2 className="text-xl font-bold text-[#2F1810] mb-6">
-                  Today's Opportunities
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    {
-                      symbol: 'V03',
-                      name: 'Venture Corp',
-                      action: 'BUY',
-                      entry: 15.8,
-                      target: 16.5,
-                      reason: 'Oversold bounce opportunity on strong support',
-                    },
-                    {
-                      symbol: 'S68',
-                      name: 'SGX',
-                      action: 'WATCH',
-                      entry: 9.2,
-                      target: 9.6,
-                      reason: 'Breaking above resistance, volume confirming',
-                    },
-                  ].map((idea, idx) => (
-                    <motion.div
-                      key={idea.symbol}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="p-5 bg-[#FAFAF9] rounded-lg border border-[#E5E5E5] hover:border-[#8B7355] transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <div className="text-lg font-bold text-[#2F1810]">{idea.symbol}</div>
-                          <div className="text-sm text-[#6B5D52]">{idea.name}</div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-[#2F1810]">
+                    AI Recommendations
+                  </h2>
+                  {loadingRecommendations && (
+                    <div className="text-sm text-[#6B5D52] flex items-center gap-2">
+                      <motion.div
+                        className="w-2 h-2 bg-[#8B7355] rounded-full"
+                        animate={{ scale: [1, 1.5, 1] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                      />
+                      Analyzing...
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {recommendations.length > 0 ? (
+                    recommendations.map((rec, idx) => (
+                      <motion.div
+                        key={rec.symbol}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="p-5 bg-[#FAFAF9] rounded-lg border border-[#E5E5E5] hover:border-[#8B7355] transition-colors"
+                      >
+                        {/* Header with symbol and action */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <div className="text-lg font-bold text-[#2F1810]">{rec.symbol}</div>
+                            {rec.sentiment_score !== undefined && (
+                              <div className="text-xs mt-1">
+                                {rec.sentiment_score >= 0.55 ? (
+                                  <span className="text-green-600">🟢 Bullish {(rec.sentiment_score * 100).toFixed(0)}%</span>
+                                ) : rec.sentiment_score <= 0.45 ? (
+                                  <span className="text-red-600">🔴 Bearish {(rec.sentiment_score * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-yellow-600">🟡 Neutral {(rec.sentiment_score * 100).toFixed(0)}%</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            className={`px-3 py-1 rounded-md text-xs font-semibold ${
+                              rec.action === 'BUY' || rec.recommendation === 'BUY'
+                                ? 'bg-green-100 text-green-700'
+                                : rec.action === 'SELL' || rec.recommendation === 'SELL'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}
+                          >
+                            {rec.action || rec.recommendation || 'ANALYZE'}
+                          </div>
                         </div>
-                        <div
-                          className={`px-3 py-1 rounded-md text-xs font-semibold ${
-                            idea.action === 'BUY'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {idea.action}
-                        </div>
-                      </div>
-                      <p className="text-[#4A3F35] text-sm mb-4">{idea.reason}</p>
-                      <div className="flex items-center justify-between text-sm">
-                        <div>
-                          <div className="text-[#6B5D52]">Entry</div>
-                          <div className="font-semibold text-[#2F1810]">${idea.entry}</div>
-                        </div>
-                        <div className="text-[#9CA3AF]">→</div>
-                        <div>
-                          <div className="text-[#6B5D52]">Target</div>
-                          <div className="font-semibold text-[#2F1810]">${idea.target}</div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+
+                        {/* Reasoning */}
+                        <p className="text-[#4A3F35] text-sm mb-3 line-clamp-2">
+                          {rec.reasoning || rec.rationale || 'AI-powered analysis based on sentiment and backtesting'}
+                        </p>
+
+                        {/* Backtest metrics if available */}
+                        {rec.backtest_metrics && (
+                          <div className="mb-3 p-2 bg-white rounded border border-[#E5E5E5]">
+                            <div className="text-xs text-[#6B5D52] mb-1">Backtest Results</div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span>Win Rate: {(rec.backtest_metrics.win_rate * 100).toFixed(0)}%</span>
+                              <span>Return: {rec.backtest_metrics.total_return?.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Price targets */}
+                        {(rec.entry_price || rec.target_price) && (
+                          <div className="flex items-center justify-between text-sm pt-3 border-t border-[#E5E5E5]">
+                            {rec.entry_price && (
+                              <div>
+                                <div className="text-[#6B5D52] text-xs">Entry</div>
+                                <div className="font-semibold text-[#2F1810]">${rec.entry_price.toFixed(2)}</div>
+                              </div>
+                            )}
+                            <div className="text-[#9CA3AF]">→</div>
+                            {rec.target_price && (
+                              <div>
+                                <div className="text-[#6B5D52] text-xs">Target</div>
+                                <div className="font-semibold text-[#2F1810]">${rec.target_price.toFixed(2)}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Disclaimer */}
+                        {rec.disclaimer && (
+                          <div className="mt-3 pt-3 border-t border-[#E5E5E5]">
+                            <p className="text-xs text-[#9CA3AF] italic">{rec.disclaimer}</p>
+                          </div>
+                        )}
+                      </motion.div>
+                    ))
+                  ) : !loadingRecommendations ? (
+                    <div className="col-span-full text-center py-8 text-[#6B5D52]">
+                      <p className="mb-2">No recommendations available yet.</p>
+                      <p className="text-sm">Make sure the AI backend is running!</p>
+                    </div>
+                  ) : null}
                 </div>
               </section>
             </motion.div>
@@ -491,31 +701,64 @@ export default function DashboardPage() {
         </AnimatePresence>
       </div>
 
-      {/* Brief Overlays - SHOW RAW BACKEND DATA */}
-      <BriefOverlay
-        isOpen={showMorningBrief && !isLoading}
-        onClose={() => setShowMorningBrief(false)}
-        type="morning"
-        brief={{
-          date: todayMorningBrief?.date || new Date().toISOString().split('T')[0],
-          summary: todayMorningBrief?.content.summary || "Loading your morning brief...",
-          market_overview: todayMorningBrief?.content.market_overview || "Markets are opening...",
-          key_points: todayMorningBrief?.content.key_points || ["Loading..."],
-          recommendations: todayMorningBrief?.content.recommendations || []
-        }}
-        rawBackendData={rawMorningData}
-      />
-      {todayEODBrief && (
-        <BriefOverlay
-          isOpen={showEODBrief}
-          onClose={() => setShowEODBrief(false)}
-          type="eod"
-          brief={{
-            date: todayEODBrief.date,
-            ...todayEODBrief.content,
+      {/* Welcome Sequence - Shows while loading */}
+      {showWelcomeSequence && !welcomeComplete && (
+        <WelcomeSequence
+          userName={user?.name || 'Partner'}
+          isDataLoaded={!isLoading && rawMorningData !== null}
+          onComplete={() => {
+            setWelcomeComplete(true)
+            setShowWelcomeSequence(false)
           }}
-          rawBackendData={rawEODData}
         />
+      )}
+      
+      {/* Debug info - remove this later */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-4 left-4 bg-black text-white p-2 text-xs z-[999]">
+          <div>User Loading: {userLoading ? 'Yes' : 'No'}</div>
+          <div>User: {user ? user.name : 'None'}</div>
+          <div>Error: {userError || 'None'}</div>
+          <div className="mt-2">
+            <button 
+              onClick={() => window.location.href = '/login?redirectTo=/dashboard'}
+              className="bg-red-600 px-2 py-1 rounded text-xs"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Brief Overlays - Only show after welcome sequence */}
+      {welcomeComplete && (
+        <>
+          <BriefOverlay
+            isOpen={showMorningBrief && !isLoading}
+            onClose={() => setShowMorningBrief(false)}
+            type="morning"
+            brief={{
+              date: todayMorningBrief?.date || new Date().toISOString().split('T')[0],
+              summary: todayMorningBrief?.content.summary || "Loading your morning brief...",
+              market_overview: todayMorningBrief?.content.market_overview || "Markets are opening...",
+              key_points: todayMorningBrief?.content.key_points || ["Loading..."],
+              recommendations: todayMorningBrief?.content.recommendations || []
+            }}
+            rawBackendData={rawMorningData}
+          />
+          {todayEODBrief && (
+            <BriefOverlay
+              isOpen={showEODBrief}
+              onClose={() => setShowEODBrief(false)}
+              type="eod"
+              brief={{
+                date: todayEODBrief.date,
+                ...todayEODBrief.content,
+              }}
+              rawBackendData={rawEODData}
+            />
+          )}
+        </>
       )}
     </div>
   )
