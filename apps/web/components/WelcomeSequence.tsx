@@ -191,13 +191,10 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete, on
     }
   }, [])
 
-  if (!show) {
-    return null
-  }
-
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] bg-white">
+      {show && (
+        <div className="fixed inset-0 z-[100] bg-white">
         {/* Stage 1: Welcome Back */}
         <AnimatePresence>
           {stage === 'welcome' && (
@@ -319,7 +316,8 @@ export default function WelcomeSequence({ userName, isDataLoaded, onComplete, on
             </div>
           )}
         </AnimatePresence>
-      </div>
+        </div>
+      )}
     </AnimatePresence>
   )
 }

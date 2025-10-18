@@ -11,7 +11,7 @@ try:
     from ..sentiment.aggregator import sentiment_aggregator
     from ..retrievers.exa_client import exa_client
     from ..memory.mem0_service import mem0_service
-    from ..utils.clients import get_openai_client
+    from ..utils.clients import get_groq_client
     from ..utils.cost_tracker import cost_tracker
     from ..utils.disclaimers import add_disclaimer_to_brief
     from ..voice.brief_narrator import brief_narrator
@@ -20,7 +20,7 @@ except ImportError:
     from sentiment.aggregator import sentiment_aggregator
     from retrievers.exa_client import exa_client
     from memory.mem0_service import mem0_service
-    from utils.clients import get_openai_client
+    from utils.clients import get_groq_client
     from utils.cost_tracker import cost_tracker
     from utils.disclaimers import add_disclaimer_to_brief
     from voice.brief_narrator import brief_narrator
@@ -41,8 +41,8 @@ class MorningBriefAgent:
     """
     
     def __init__(self):
-        self.client = get_openai_client()
-        self.model = "gpt-4o-mini"
+        self.client = get_groq_client()
+        self.model = "llama-3.3-70b-versatile"
         logger.info("Initialized Morning Brief Agent")
     
     async def generate_brief(

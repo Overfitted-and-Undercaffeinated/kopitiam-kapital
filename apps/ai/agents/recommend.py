@@ -8,7 +8,7 @@ from datetime import datetime
 
 # Flexible imports
 try:
-    from ..utils.clients import get_openai_client
+    from ..utils.clients import get_groq_client
     from ..sentiment.aggregator import sentiment_aggregator
     from ..data.market_data import market_data_service
     from ..backtesting.templates import get_template
@@ -22,7 +22,7 @@ try:
     from ..utils.config import settings
     from ..data.indicators import calculate_atr
 except ImportError:
-    from utils.clients import get_openai_client
+    from utils.clients import get_groq_client
     from sentiment.aggregator import sentiment_aggregator
     from data.market_data import market_data_service
     from backtesting.templates import get_template
@@ -51,8 +51,8 @@ class RecommendationAgent:
     """
     
     def __init__(self):
-        self.client = get_openai_client()
-        self.model = "gpt-4o-mini"  # Fast and cost-effective
+        self.client = get_groq_client()
+        self.model = "llama-3.3-70b-versatile"  # Fast and cost-effective
         self.mem0_enabled = settings.use_mem0
         self.mcp_enabled = settings.use_mcp_risk_tools
         
