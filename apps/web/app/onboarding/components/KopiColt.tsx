@@ -187,7 +187,12 @@ export default function KopiColt({ expression, cursorPosition, step, isIntro, on
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        console.warn('❌ Voice generation failed:', errorData)
+        // Timeout (408) or other errors - skip voice and continue
+        if (response.status === 408) {
+          console.warn('⏱️ Voice generation timed out, continuing without audio')
+        } else {
+          console.warn('❌ Voice generation failed:', errorData)
+        }
         return
       }
 

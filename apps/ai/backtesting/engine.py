@@ -38,6 +38,77 @@ class Trade:
 class BacktestEngine:
     """Simple backtesting for trading strategies"""
     
+    def __init__(self):
+        """Initialize engine with optional explainer"""
+        self.explainer = None
+        # Try to import explainer but don't fail if unavailable
+        try:
+            from ..agents.backtest_explainer import backtest_explainer
+            self.explainer = backtest_explainer
+        except ImportError:
+            try:
+                from agents.backtest_explainer import backtest_explainer
+                self.explainer = backtest_explainer
+            except ImportError:
+                logger.warning("BacktestExplainerAgent not available - explanations disabled")
+    
+    async def generate_explanation(
+        self,
+        strategy_name: str,
+        strategy_description: str,
+        metrics: Dict,
+        symbol: str,
+        period: str
+    ) -> str:
+        """
+        Generate natural language explanation of backtest results
+        
+        Args:
+            strategy_name: Name of the strategy
+            strategy_description: Description of what strategy does
+            metrics: Backtest metrics dict
+            symbol: Stock symbol tested
+            period: Time period tested
+        
+        Returns:
+            Explanation text suitable for voice narration
+        """
+        if not self.explainer:
+            logger.warning("Explainer not available, returning basic explanation")
+            return self._generate_basic_explanation(strategy_name, metrics, symbol, period)
+        
+        try:
+            explanation = await self.explainer.generate_explanation(
+                strategy_name=strategy_name,
+                strategy_description=strategy_description,
+                metrics=metrics,
+                symbol=symbol,
+                period=period
+            )
+            return explanation
+        except Exception as e:
+            logger.error(f"Failed to generate explanation: {e}")
+            return self._generate_basic_explanation(strategy_name, metrics, symbol, period)
+    
+    def _generate_basic_explanation(
+        self,
+        strategy_name: str,
+        metrics: Dict,
+        symbol: str,
+        period: str
+    ) -> str:
+        """Generate simple template-based explanation"""
+        win_rate = metrics.get('win_rate', 0) * 100
+        total_return = metrics.get('total_return_pct', 0) * 100
+        sharpe = metrics.get('sharpe_ratio', 0)
+        max_dd = metrics.get('max_drawdown', 0) * 100
+        num_trades = metrics.get('num_trades', 0)
+        
+        performance = "profitable" if total_return > 0 else "unprofitable"
+        quality = "good" if sharpe > 1 else "moderate" if sharpe > 0.5 else "poor"
+        
+        return f"""The {strategy_name} strategy on {symbol} from {period} generated {num_trades} trades with a {win_rate:.0f}% win rate. Overall, it was {performance}, delivering a total return of {total_return:.1f}%. The Sharpe ratio of {sharpe:.2f} indicates {quality} risk-adjusted returns. The maximum drawdown was {abs(max_dd):.1f}%, meaning at worst, you would have seen your capital decline by that amount from peak. {'This strategy shows promise and may be worth considering with proper risk management.' if total_return > 0 and sharpe > 1 else 'This strategy may need refinement or may not be suitable for current market conditions.'} Remember, past performance does not guarantee future results."""
+    
     async def run_backtest(
         self,
         symbol: str,

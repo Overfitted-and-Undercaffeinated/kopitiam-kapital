@@ -11,17 +11,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   console.log('🚨 MIDDLEWARE RUNNING - Path:', request.nextUrl.pathname)
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
-
+  
   // Define protected routes first
   const protectedRoutes = ['/dashboard', '/assistant', '/portfolio', '/backtest', '/analysis', '/alerts', '/sentiment']
   const isProtectedRoute = protectedRoutes.some(route => 
     request.nextUrl.pathname.startsWith(route)
   )
+  
+  // Define public auth routes
+  const authRoutes = ['/login', '/onboarding']
+  const isAuthRoute = authRoutes.includes(request.nextUrl.pathname)
 
   try {
     // Check environment variables
@@ -30,8 +29,14 @@ export async function middleware(request: NextRequest) {
       if (isProtectedRoute) {
         return NextResponse.redirect(new URL('/login', request.url))
       }
-      return response
+      return NextResponse.next()
     }
+
+    let response = NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    })
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -42,15 +47,11 @@ export async function middleware(request: NextRequest) {
             return request.cookies.get(name)?.value
           },
           set(name: string, value: string, options: CookieOptions) {
+            // Update both request and response cookies
             request.cookies.set({
               name,
               value,
               ...options,
-            })
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
             })
             response.cookies.set({
               name,
@@ -59,15 +60,11 @@ export async function middleware(request: NextRequest) {
             })
           },
           remove(name: string, options: CookieOptions) {
+            // Update both request and response cookies
             request.cookies.set({
               name,
               value: '',
               ...options,
-            })
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
             })
             response.cookies.set({
               name,
@@ -88,6 +85,7 @@ export async function middleware(request: NextRequest) {
     // Debug logging
     console.log('🔍 Middleware - User:', user ? { id: user.id, email: user.email } : 'None')
     console.log('🔍 Middleware - Is protected route:', isProtectedRoute)
+    console.log('🔍 Middleware - Is auth route:', isAuthRoute)
 
     // Redirect to login if accessing protected route without authentication
     if (isProtectedRoute && !user) {
@@ -97,20 +95,26 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl)
     }
 
-    // Redirect to dashboard if already logged in and trying to access login/onboarding
-    if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/onboarding')) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+    // Only redirect away from auth routes if user is authenticated AND not coming from a redirect
+    // This prevents the loop during the authentication flow
+    if (user && isAuthRoute) {
+      const redirectTo = request.nextUrl.searchParams.get('redirectTo')
+      // If there's a redirectTo parameter, don't redirect away - let the login page handle it
+      if (!redirectTo) {
+        console.log('🔍 Middleware - User already authenticated, redirecting to dashboard')
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
     }
 
     return response
 
   } catch (error) {
     console.error('🚨 Middleware - Failed to create Supabase client:', error)
-    // Redirect to login on error for protected routes
+    // Redirect to login on error for protected routes only
     if (isProtectedRoute) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    return response
+    return NextResponse.next()
   }
 }
 

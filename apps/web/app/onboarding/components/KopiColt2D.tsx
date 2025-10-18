@@ -222,6 +222,19 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
       if (!response.ok) {
         const errorData = await response.json()
         
+        // Handle timeout (408) - skip voice and continue
+        if (response.status === 408) {
+          console.warn('⏱️ Voice generation timed out, continuing without audio')
+          setIsPlayingAudio(false)
+          setTimeout(() => {
+            setVoiceText('')
+            if (text.includes("Howdy, partner!") && onIntroComplete) {
+              onIntroComplete()
+            }
+          }, 2000)
+          return
+        }
+        
         // If quota exceeded, just skip voice playback silently
         if (errorData.error === 'quota_exceeded') {
           console.warn('⚠️ Voice API quota exceeded, skipping voice playback')

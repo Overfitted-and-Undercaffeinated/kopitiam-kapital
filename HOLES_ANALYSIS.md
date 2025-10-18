@@ -282,3 +282,4 @@ If you have 30 minutes before demo:
 Your hackathon project is solid. The holes are all infrastructure/polish, not logic bugs!
 
 
+
