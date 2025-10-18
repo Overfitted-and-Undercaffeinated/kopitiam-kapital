@@ -238,7 +238,13 @@ Provide:
 4. Next steps for learning
 5. Related topics to explore
 
-Adapt to {knowledge_level} level trader."""
+Adapt to {knowledge_level} level trader.
+
+IMPORTANT: Use HTML formatting:
+- Use <h3>Clear Explanation</h3> for headers
+- Use <b>bold text</b> for emphasis
+- Do NOT use markdown syntax like **bold** or ### headers
+- Use <br> for line breaks if needed"""
         
         # Add tier-specific instructions
         if tier == UserTier.PRO:
@@ -285,7 +291,7 @@ Adapt to {knowledge_level} level trader."""
     
     def _build_system_prompt(self, knowledge_level: str, depth: str, tier: UserTier) -> str:
         """Build system prompt based on user attributes"""
-        base_prompt = "You are a patient and knowledgeable trading educator."
+        base_prompt = "You are a patient and knowledgeable trading educator. Use HTML formatting: <h3> for headers, <b> for bold text. Do NOT use markdown syntax."
         
         if knowledge_level == KnowledgeLevel.BEGINNER:
             base_prompt += " Explain concepts clearly using simple language and analogies. Avoid jargon."

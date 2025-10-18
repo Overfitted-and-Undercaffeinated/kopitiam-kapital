@@ -406,9 +406,12 @@ export default function AssistantPage() {
                       {message.detailedResponse && (
                         <div className="bg-[#FAFAF9] rounded-2xl px-5 py-4 border border-[#E5E5E5]">
                           <div className="prose prose-sm max-w-none">
-                            <pre className="whitespace-pre-wrap font-sans text-[#4A3F35] text-sm leading-relaxed">
-                              {message.detailedResponse}
-                            </pre>
+                            <div 
+                              className="font-sans text-[#4A3F35] text-sm leading-relaxed"
+                              dangerouslySetInnerHTML={{ 
+                                __html: message.detailedResponse.replace(/\n/g, '<br>') 
+                              }}
+                            />
                           </div>
                         </div>
                       )}
