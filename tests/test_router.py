@@ -50,7 +50,7 @@ class TestRouterBasic:
     async def test_router_initialization(self, router_agent):
         """Test router agent initializes correctly"""
         assert router_agent.name == "router"
-        assert router_agent.model == "mixtral-8x7b-32768"
+        assert router_agent.model == "llama-3.3-70b-versatile"
         assert router_agent.client is not None
     
     @pytest.mark.asyncio

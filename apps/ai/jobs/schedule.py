@@ -16,9 +16,9 @@ def setup_schedule():
             'task': 'jobs.tasks.send_eod_reports',
             'schedule': '0 18 * * 1-5',  # 6 PM weekdays
         },
-        'market-monitor': {
-            'task': 'jobs.tasks.monitor_markets',
-            'schedule': 300,  # Every 5 minutes
+        'position-monitor': {
+            'task': 'jobs.tasks.monitor_all_positions',
+            'schedule': 60,  # Every 60 seconds
         },
     }
     

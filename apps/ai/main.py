@@ -10,6 +10,7 @@ import logging
 import time
 from pathlib import Path
 from typing import Dict
+from contextlib import asynccontextmanager
 
 # Load environment variables from project root
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -26,11 +27,44 @@ logger = logging.getLogger(__name__)
 from models.schemas import RouterRequest, RouterResponse, BriefRequest, BriefResponse
 from agents.router import RouterAgent
 
+# Lifespan handler for startup/shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan handler for resource management
+    
+    Handles:
+    - Startup initialization
+    - Graceful shutdown and cleanup
+    """
+    # Startup
+    logger.info("🚀 Starting Kopitiam Capital AI Backend...")
+    yield
+    # Shutdown
+    logger.info("🔄 Shutting down gracefully...")
+    
+    # Close asyncpraw Reddit client
+    try:
+        from sentiment.social_scraper import social_sentiment_analyzer
+        await social_sentiment_analyzer.close()
+    except Exception as e:
+        logger.warning(f"Error closing social sentiment analyzer: {e}")
+    
+    # Close shared HTTP client
+    try:
+        from utils.http_client import http_client_manager
+        await http_client_manager.close()
+    except Exception as e:
+        logger.warning(f"Error closing HTTP client: {e}")
+    
+    logger.info("✅ Shutdown complete")
+
 # Create FastAPI app
 app = FastAPI(
     title="Kopitiam Capital AI",
     description="AI-powered trading intelligence API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -302,11 +336,236 @@ async def generate_eod_report(user_id: str):
     # TODO: Implement EOD report agent
     return {"message": "Not implemented yet"}
 
-@app.post("/ai/longctx")
-async def analyze_filing(ticker: str, filing_type: str):
-    """Analyze long-form financial documents"""
-    # TODO: Implement long-context analyst
-    return {"message": "Not implemented yet"}
+# ============================================================================
+# MONITOR, LONG CONTEXT, AND EXPLAINER ENDPOINTS
+# ============================================================================
+
+@app.post("/alerts/check")
+async def check_user_alerts(user_id: str):
+    """
+    Check and trigger user alerts
+    
+    Monitors positions and alert rules, triggers notifications for:
+    - Price thresholds (FREE tier)
+    - Volatility + sentiment changes (PRO tier)
+    - News events + technical signals (ENTERPRISE tier)
+    
+    Alert limits:
+    - FREE: 3 per day
+    - PRO: 50 per day
+    - ENTERPRISE: Unlimited
+    """
+    try:
+        from agents.monitor import market_monitor_agent
+        
+        logger.info(f"Checking alerts for user {user_id}")
+        
+        # Check alerts
+        alerts = await market_monitor_agent.check_alerts(user_id)
+        
+        # Check positions
+        position_alerts = await market_monitor_agent.monitor_positions(user_id)
+        
+        return {
+            "user_id": user_id,
+            "alerts": alerts,
+            "position_alerts": position_alerts,
+            "total_triggered": len(alerts) + len(position_alerts)
+        }
+    
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error checking alerts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/alerts/create")
+async def create_alert_rule(
+    user_id: str,
+    symbol: str,
+    alert_type: str,
+    condition: Dict
+):
+    """
+    Create a new alert rule
+    
+    Args:
+        user_id: User ID
+        symbol: Stock symbol
+        alert_type: Type of alert (price_above, price_below, etc.)
+        condition: Alert condition (e.g., {"price": 100})
+    
+    Returns:
+        Created alert rule
+    """
+    try:
+        from agents.monitor import market_monitor_agent, AlertType
+        
+        logger.info(f"Creating alert for {user_id}: {symbol} {alert_type}")
+        
+        # Create alert rule
+        alert_rule = await market_monitor_agent.create_alert_rule(
+            user_id=user_id,
+            symbol=symbol,
+            alert_type=AlertType(alert_type),
+            condition=condition
+        )
+        
+        return alert_rule
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating alert: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis/long-context")
+async def analyze_long_document(
+    text: str,
+    document_type: str,
+    user_id: str,
+    ticker: str = None
+):
+    """
+    Analyze long-form financial documents
+    
+    Uses Anthropic Claude with 200K context window.
+    
+    Analysis depth by tier:
+    - FREE: Basic summary + metrics (1 per month)
+    - PRO: Summary + risks + opportunities (10 per month)
+    - ENTERPRISE: Full analysis + competitive positioning (unlimited)
+    
+    Args:
+        text: Document text
+        document_type: Type (e.g., "10-K", "annual_report", "earnings_call")
+        user_id: User ID
+        ticker: Optional stock ticker
+    
+    Returns:
+        Analysis results
+    """
+    try:
+        from agents.longctx import long_context_analyst
+        
+        logger.info(f"Analyzing {document_type} for user {user_id} (ticker: {ticker})")
+        
+        # Analyze document
+        analysis = await long_context_analyst.analyze_document(
+            text=text,
+            document_type=document_type,
+            user_id=user_id,
+            ticker=ticker
+        )
+        
+        return analysis
+    
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error analyzing document: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis/long-context/auto-fetch")
+async def auto_fetch_and_analyze(
+    ticker: str,
+    user_id: str,
+    include_earnings_call: bool = True
+):
+    """
+    Auto-fetch and analyze financial documents via Exa.ai
+    
+    Automatically searches for and analyzes:
+    - Latest 10-K (SEC filing)
+    - Latest earnings call transcript (optional)
+    
+    Analysis depth by tier:
+    - FREE: Basic summary (1 document/month)
+    - PRO: Summary + risks + opportunities (10 documents/month)
+    - ENTERPRISE: Full analysis (unlimited)
+    
+    Args:
+        ticker: Stock ticker (e.g., "AAPL", "TSLA", "GOOGL")
+        user_id: User ID
+        include_earnings_call: Whether to include earnings call (default: True)
+    
+    Returns:
+        Combined analysis of fetched documents
+    """
+    try:
+        from agents.longctx import long_context_analyst
+        
+        logger.info(f"Auto-fetching documents for {ticker} (user: {user_id})")
+        
+        # Fetch and analyze documents
+        analysis = await long_context_analyst.fetch_and_analyze(
+            ticker=ticker,
+            user_id=user_id,
+            include_earnings_call=include_earnings_call
+        )
+        
+        return analysis
+    
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in auto-fetch-and-analyze: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/explain")
+async def explain_concept(
+    topic: str,
+    user_id: str,
+    level_override: str = None,
+    category: str = None
+):
+    """
+    Explain a trading concept
+    
+    Adapts explanation to user's knowledge level (from Mem0 profile).
+    
+    Topics by tier:
+    - FREE: Trading concepts (RSI, MACD, support/resistance)
+    - PRO: + Platform features (briefs, alerts, backtesting)
+    - ENTERPRISE: + Advanced strategies (swing trading, risk management)
+    
+    Args:
+        topic: Topic to explain
+        user_id: User ID
+        level_override: Override knowledge level (beginner/intermediate/advanced)
+        category: Optional category hint
+    
+    Returns:
+        Explanation with examples and next steps
+    """
+    try:
+        from agents.explainer import explainer_agent
+        
+        logger.info(f"Explaining '{topic}' to user {user_id}")
+        
+        # Generate explanation
+        explanation = await explainer_agent.explain(
+            topic=topic,
+            user_id=user_id,
+            level_override=level_override,
+            category=category
+        )
+        
+        # Check for upgrade prompt
+        if "error" in explanation:
+            raise HTTPException(status_code=403, detail=explanation["error"])
+        
+        return explanation
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error explaining topic: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================
 # BACKTESTING ENDPOINTS
@@ -445,9 +704,10 @@ async def get_sentiment(symbol: str, user_id: str = None):
     **Latency target**: <3s (95th percentile)
     
     Combines:
-    - News sentiment (Exa.ai + LLM scoring) - 40% weight
-    - Reddit sentiment (r/wallstreetbets, r/stocks) - 30% weight
-    - StockTwits sentiment - 30% weight
+    - News sentiment (Exa.ai + LLM scoring) - 60% weight
+    - Reddit sentiment (r/wallstreetbets, r/stocks) - 40% weight
+    
+    Note: StockTwits removed from analysis
     
     Returns:
         {

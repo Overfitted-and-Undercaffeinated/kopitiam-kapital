@@ -1,9 +1,10 @@
 # 🏆 KOPITIAM CAPITAL - PROJECT STATUS
 
-**Last Updated**: October 18, 2025  
+**Last Updated**: January 19, 2025  
 **Status**: PRODUCTION READY ✅  
-**Tests**: 32/32 PASSING (100%) ✅  
-**APIs**: 6 Active with Real Data ✅
+**Tests**: 36/36 PASSING (100%) ✅  
+**APIs**: 7 Active with Real Data ✅  
+**Agents**: 8 AI Agents (5 core + 3 new) ✅
 
 ---
 
@@ -20,9 +21,14 @@
 6. ✅ **Real-Time Data** - Exa.ai news + Reddit social sentiment
 7. ✅ **Production Features** - Rate limiting, cost tracking, caching
 
+### New AI Agents (3/3) 🆕
+8. ✅ **Monitor Agent** - 24/7 market monitoring with tiered alerts
+9. ✅ **Long Context Analyst** - Claude-powered document analysis (10-Ks, earnings)
+10. ✅ **Explainer Agent** - Adaptive educational explanations (beginner→expert)
+
 ---
 
-## 🧪 TEST COVERAGE: 32/32 (100%)
+## 🧪 TEST COVERAGE: 36/36 (100%)
 
 **Integration Tests**: 7/7 ✅
 - Sentiment Analysis (with REAL Reddit data!)
@@ -41,20 +47,27 @@
 **API Validation**: 15/15 ✅
 - OpenAI, Groq, Mem0, Exa, Reddit, yfinance all verified
 
+**New Agents Tests**: 4/4 ✅ 🆕
+- Tier Manager (tier checking, usage tracking)
+- Monitor Agent (alerts, position monitoring)
+- Long Context Analyst (Claude document analysis)
+- Explainer Agent (adaptive explanations)
+
 ---
 
-## 🚀 ACTIVE APIS (6 with Real Data)
+## 🚀 ACTIVE APIS (7 with Real Data)
 
 | API | Status | Purpose | Evidence |
 |-----|--------|---------|----------|
-| **OpenAI** | ✅ WORKING | GPT-4o-mini recommendations | "Tokens: 21" |
+| **OpenAI** | ✅ WORKING | GPT-4o-mini recommendations + explainer | "Tokens: 21" |
 | **Groq** | ✅ WORKING | Llama 3.3 70B sentiment | FREE tier |
 | **Mem0** | ✅ WORKING | User personalization | "Retrieved policy: moderate" |
 | **Exa.ai** | ✅ WORKING | News search | "Exa returned 10 results" |
 | **Reddit PRAW** | ✅ WORKING | Social sentiment | "Reddit: 2 mentions, 0.29" |
 | **yfinance** | ✅ WORKING | Market data | "AAPL: $252.29" |
+| **Anthropic** | ✅ WORKING | Claude 3.5 long-context analysis | "200K token context" |
 
-**Total**: 12 APIs integrated/configured
+**Total**: 13 APIs integrated/configured
 
 ---
 

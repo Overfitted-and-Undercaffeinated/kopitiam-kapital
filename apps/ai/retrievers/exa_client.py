@@ -223,12 +223,18 @@ class ExaClient:
                 "type": "neural",  # Semantic search
                 "category": "financial news",
                 "use_autoprompt": True,  # Let Exa optimize query
+                "text": {"max_characters": 1000} if mode == "deep" else {"max_characters": 500},  # Get article text
+                "highlights": {
+                    "highlights_per_url": 3,
+                    "num_sentences": 2,
+                    "query": f"{query} sentiment analysis"
+                }
             }
             
             # Add recency filter for fast mode
             if mode == "fast":
-                # Recent news only (last 72 hours)
-                start_date = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
+                # Recent news only (last 7 days for better results)
+                start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
                 search_params["start_published_date"] = start_date
             
             # Execute search
@@ -241,9 +247,173 @@ class ExaClient:
             return results
             
         except Exception as e:
-            logger.error(f"Exa search error: {e}")
-            raise
+            logger.error(f"Exa search failed: {e}")
+            return []
     
+    async def search_financial_documents(
+        self,
+        ticker: str,
+        document_type: str = "10-K"
+    ) -> Optional[Dict]:
+        """
+        Search for specific financial documents (10-K, earnings calls, annual reports)
+        
+        Args:
+            ticker: Stock ticker (e.g., "AAPL")
+            document_type: Type of document ("10-K", "earnings_call", "annual_report")
+        
+        Returns:
+            Document with full text or None if not found
+        """
+        try:
+            # Build search query for Exa.ai
+            if document_type == "10-K":
+                query = f"{ticker} 10-K SEC filing latest 2024 2025"
+            elif document_type == "earnings_call":
+                query = f"{ticker} earnings call transcript latest"
+            elif document_type == "annual_report":
+                query = f"{ticker} annual report latest"
+            else:
+                query = f"{ticker} {document_type} latest"
+            
+            logger.info(f"Searching for {document_type} for {ticker}: {query}")
+            
+            if settings.use_mock_exa:
+                # Return mock document for testing
+                return {
+                    "title": f"{ticker} {document_type}",
+                    "url": f"https://example.com/{ticker}-{document_type}",
+                    "text": self._get_mock_document(ticker, document_type),
+                    "published": datetime.now().isoformat(),
+                    "source": "mock"
+                }
+            
+            if not self.client:
+                logger.error("Exa client not initialized")
+                return None
+            
+            # Search with deep mode to get full text
+            search_params = {
+                "query": query,
+                "num_results": 3,  # Get top 3 matches
+                "type": "neural",
+                "category": "financial documents",
+                "use_autoprompt": True,
+                "text": {"max_characters": 50000},  # Get significant text
+            }
+            
+            response = self.client.search_and_contents(**search_params)
+            
+            if response.results:
+                # Parse and return the first (best match) result
+                best_result = response.results[0]
+                return {
+                    "title": best_result.title,
+                    "url": best_result.url,
+                    "text": best_result.text or "",
+                    "published": best_result.published_date if hasattr(best_result, 'published_date') else datetime.now().isoformat(),
+                    "source": "exa"
+                }
+            
+            logger.warning(f"No {document_type} found for {ticker}")
+            return None
+        
+        except Exception as e:
+            logger.error(f"Error searching for {document_type} ({ticker}): {e}")
+            return None
+    
+    def _get_mock_document(self, ticker: str, document_type: str) -> str:
+        """Return mock financial document for testing"""
+        mock_docs = {
+            "10-K": f"""
+SEC FORM 10-K: {ticker} ANNUAL REPORT
+
+This is a mock 10-K filing for testing purposes.
+
+BUSINESS OVERVIEW:
+{ticker} is a leading technology company focused on innovation and customer satisfaction.
+The company operates in multiple segments including software, hardware, and services.
+
+FINANCIAL HIGHLIGHTS:
+- Revenue: $150 billion
+- Net Income: $25 billion  
+- Operating Margin: 16.7%
+- R&D Investment: $10 billion
+
+RISKS:
+- Market competition
+- Regulatory changes
+- Supply chain disruption
+- Currency fluctuations
+
+MANAGEMENT'S DISCUSSION & ANALYSIS:
+The company performed well in fiscal year 2024, with strong revenue growth of 12% year-over-year.
+Growth was driven by enterprise demand and new product launches.
+
+OUTLOOK:
+Management expects continued growth in the coming year, with focus on AI integration and sustainability.
+""",
+            "earnings_call": f"""
+{ticker} Q4 2024 EARNINGS CALL TRANSCRIPT
+
+CEO: Good afternoon everyone. Q4 was an exceptional quarter for {ticker}.
+
+FINANCIAL RESULTS:
+- Revenue: $38.5B (+12% YoY)
+- Gross Margin: 46%
+- Net Income: $7.2B
+- EPS: $2.50
+
+BUSINESS SEGMENTS:
+1. Cloud Services: $15.2B revenue, +18% growth
+2. AI Products: $8.1B revenue, +45% growth  
+3. Traditional: $15.2B revenue, +2% growth
+
+KEY ACHIEVEMENTS:
+- Launched new AI assistant product
+- Expanded cloud partnerships
+- Improved operational efficiency
+
+GUIDANCE:
+Q1 2025: Revenue $37-39B
+FY 2025: Revenue $155-160B
+
+Q&A SESSION:
+Analyst: Can you talk about AI adoption?
+CEO: AI adoption is accelerating across all segments...
+""",
+            "annual_report": f"""
+{ticker} 2024 ANNUAL REPORT
+
+LETTER TO SHAREHOLDERS:
+Dear Shareholders,
+2024 was a transformative year for {ticker}...
+
+KEY METRICS:
+- Total Revenue: $152.8B (+12%)
+- Operating Income: $25.5B
+- Free Cash Flow: $28.3B
+- Capital Returned: $35B
+
+SUSTAINABILITY:
+- Carbon neutral operations achieved
+- 50% renewable energy
+- Diversity: 40% women in leadership
+
+INNOVATION:
+- 3 major product launches
+- 15% budget increase for R&D
+- 2,500+ patents filed
+
+STRATEGIC INITIATIVES:
+1. AI-first approach
+2. Cloud expansion
+3. Emerging markets focus
+"""
+        }
+        return mock_docs.get(document_type, f"Mock {document_type} for {ticker}")
+
+
     def _parse_results(self, response, mode: str) -> List[Dict]:
         """
         Parse Exa response to standard format

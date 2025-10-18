@@ -18,7 +18,8 @@ class Trade:
         entry_date: datetime,
         stop: float,
         target: float,
-        direction: str = "BUY"
+        direction: str = "BUY",
+        shares: int = 1
     ):
         self.symbol = symbol
         self.entry_price = entry_price
@@ -26,11 +27,12 @@ class Trade:
         self.stop = stop
         self.target = target
         self.direction = direction
+        self.shares = shares  # Number of shares in position
         
         self.exit_price: Optional[float] = None
         self.exit_date: Optional[datetime] = None
-        self.pnl: Optional[float] = None
-        self.pnl_pct: Optional[float] = None
+        self.pnl: Optional[float] = None  # Total P&L in dollars
+        self.pnl_pct: Optional[float] = None  # Percentage return
         self.outcome: Optional[str] = None  # 'win', 'loss', 'breakeven'
 
 class BacktestEngine:
@@ -118,6 +120,12 @@ class BacktestEngine:
             signal = await strategy_fn(window)
             
             if signal and not current_position:
+                # Calculate position size based on signal
+                position_size_pct = signal.get('position_size_pct', 0.10)  # Default 10%
+                position_value = capital * position_size_pct
+                shares = int(position_value / current_price)
+                shares = max(1, shares)  # At least 1 share
+                
                 # Open new position
                 current_position = Trade(
                     symbol=data.index.name or 'UNKNOWN',
@@ -125,7 +133,8 @@ class BacktestEngine:
                     entry_date=current_date,
                     stop=signal.get('stop', current_price * 0.95),
                     target=signal.get('target', current_price * 1.10),
-                    direction=signal.get('direction', 'BUY')
+                    direction=signal.get('direction', 'BUY'),
+                    shares=shares
                 )
             
             elif current_position:
@@ -147,12 +156,17 @@ class BacktestEngine:
                 
                 # Calculate P&L if exited
                 if current_position.exit_price:
-                    current_position.pnl = (
-                        current_position.exit_price - current_position.entry_price
-                    )
-                    current_position.pnl_pct = (
-                        current_position.pnl / current_position.entry_price
-                    )
+                    # Per-share P&L
+                    pnl_per_share = current_position.exit_price - current_position.entry_price
+                    
+                    # Total P&L (multiply by shares)
+                    current_position.pnl = pnl_per_share * current_position.shares
+                    
+                    # Percentage return (same regardless of shares)
+                    current_position.pnl_pct = pnl_per_share / current_position.entry_price
+                    
+                    # Update capital with P&L
+                    capital += current_position.pnl
                     
                     trades.append(current_position)
                     current_position = None
@@ -190,11 +204,14 @@ class BacktestEngine:
         # Returns
         returns = [t.pnl_pct for t in trades if t.pnl_pct]
         
-        # Sharpe ratio (simplified)
-        if returns:
+        # Sharpe ratio
+        # Note: This is a simplified calculation using per-trade returns
+        # For proper Sharpe, we'd need daily portfolio returns
+        if returns and len(returns) > 1:
             avg_return = sum(returns) / len(returns)
             std_return = pd.Series(returns).std()
-            sharpe_ratio = (avg_return / std_return) * (252 ** 0.5) if std_return > 0 else 0.0
+            # Calculate Sharpe based on per-trade returns (no annualization)
+            sharpe_ratio = avg_return / std_return if std_return > 0 else 0.0
         else:
             sharpe_ratio = 0.0
         
@@ -233,6 +250,7 @@ class BacktestEngine:
             'exit_date': trade.exit_date.isoformat() if trade.exit_date else None,
             'stop': trade.stop,
             'target': trade.target,
+            'shares': trade.shares,
             'pnl': trade.pnl,
             'pnl_pct': trade.pnl_pct,
             'outcome': trade.outcome
