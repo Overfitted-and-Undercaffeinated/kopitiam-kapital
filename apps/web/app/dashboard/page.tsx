@@ -102,7 +102,7 @@ export default function DashboardPage() {
     fetchRealBriefs(userId)
     
     // Fetch recommendations for watchlist
-    fetchRecommendations(userId, ['NVDA', 'AAPL', 'DBS'])
+    fetchRecommendations(userId, ['NVDA', 'AAPL', 'MSFT'])
   }, [])
   
   const fetchRealBriefs = async (userId: string) => {
@@ -110,7 +110,7 @@ export default function DashboardPage() {
     
     try {
       const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
-      const watchlist = ['NVDA', 'AAPL', 'DBS'] // Default watchlist
+      const watchlist = ['NVDA', 'AAPL', 'MSFT'] // Default watchlist
       
       console.log('=== FETCHING MORNING BRIEF FROM PYTHON API ===')
       console.log('API URL:', AI_API_URL)
