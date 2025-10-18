@@ -194,36 +194,36 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FFF8DC] via-[#FFE4B5] to-[#FFDAB9] relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF8DC] via-[#FFE4B5] to-[#FFDAB9] relative overflow-hidden" style={{ fontFamily: 'var(--font-body)' }}>
       {/* Desert Background */}
-      {!showStartOverlay && <DesertBackground />}
+      <DesertBackground />
       
       {/* Start Overlay */}
       <AnimatePresence>
         {showStartOverlay && (
           <motion.div
-            className="fixed inset-0 bg-gradient-to-br from-[#CD853F] via-[#D2691E] to-[#A0522D] flex items-center justify-center z-50 cursor-pointer"
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 cursor-pointer"
             onClick={handleStart}
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
           >
             <motion.div
-              className="text-center space-y-6"
+              className="text-center space-y-6 px-8"
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
-              <h2 className="text-8xl font-bold text-[#FFF8DC]" style={{ fontFamily: 'var(--font-bowlby)' }}>
+              <h2 className="text-8xl font-bold text-[#FFF8DC] drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]" style={{ fontFamily: 'var(--font-heading)' }}>
                 Let's get you started
               </h2>
-              <p className="text-2xl text-[#FFE4B5] font-bold">
+              <p className="text-2xl text-[#FFE4B5] font-bold drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
                 click anywhere to continue
               </p>
               <motion.div
                 animate={{ y: [0, 15, 0] }}
                 transition={{ duration: 2, repeat: Infinity }}
-                className="text-5xl text-[#FFF8DC] opacity-80"
+                className="text-5xl text-[#FFF8DC] opacity-80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
               >
                 ↓
               </motion.div>
@@ -273,7 +273,7 @@ export default function OnboardingPage() {
                 transition={{ duration: 0.5 }}
                 className="space-y-8"
               >
-                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-bowlby)' }}>
+                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-heading)' }}>
                   Who are you, partner?
                 </h1>
 
@@ -339,7 +339,7 @@ export default function OnboardingPage() {
                 transition={{ duration: 0.5 }}
                 className="space-y-8"
               >
-                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-bowlby)' }}>
+                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-heading)' }}>
                   Trading Experience
                 </h1>
 
@@ -402,7 +402,7 @@ export default function OnboardingPage() {
                 transition={{ duration: 0.5 }}
                 className="space-y-8"
               >
-                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-bowlby)' }}>
+                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-heading)' }}>
                   Market Preferences
                 </h1>
 
@@ -438,7 +438,7 @@ export default function OnboardingPage() {
                       type="time"
                       value={formData.briefTime}
                       onChange={(e) => updateFormData('briefTime', e.target.value)}
-                      className="w-full px-6 py-5 rounded-2xl border-3 border-[#CD853F] bg-white text-[#2F1810] text-xl font-semibold focus:outline-none focus:border-[#D2691E] focus:ring-4 focus:ring-[#CD853F]/30 transition-all shadow-lg"
+                      className="w-full px-6 py-5 rounded-2xl border-3 border-[#CD853F] bg-white text-[#2F1810] text-xl font-semibold focus:outline-none focus:border-[#D2691E] focus:ring-4 focus:ring-[#CD853F]/30 transition-all shadow-lg time-picker-western"
                     />
                   </div>
                 </div>
@@ -454,7 +454,7 @@ export default function OnboardingPage() {
                 transition={{ duration: 0.5 }}
                 className="space-y-8"
               >
-                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-bowlby)' }}>
+                <h1 className="text-6xl font-bold text-[#2F1810] mb-6" style={{ fontFamily: 'var(--font-heading)' }}>
                   Initial Watchlist
                 </h1>
 

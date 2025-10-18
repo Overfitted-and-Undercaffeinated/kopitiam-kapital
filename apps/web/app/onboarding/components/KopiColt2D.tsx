@@ -449,75 +449,91 @@ export default function KopiColt2D({ expression, step, isIntro, onIntroComplete,
           <path d="M 62 62 L 55 70 L 60 75 L 68 68 Z" fill="#4A3728" stroke="#3A2718" strokeWidth="2" />
           <path d="M 138 62 L 145 70 L 140 75 L 132 68 Z" fill="#4A3728" stroke="#3A2718" strokeWidth="2" />
           
-          {/* Eyes - Brawl Stars style with bold outlines and blinking - friendlier look */}
+          {/* Eyes - Duolingo style: semi-circle on top + rectangle below */}
           {!isBlinking ? (
             <>
-              {/* Left eye */}
-              <ellipse 
-                cx="78" 
-                cy="100" 
-                rx="11" 
-                ry="13" 
-                fill="white" 
-                stroke="#2C1810" 
-                strokeWidth="2.5"
-              />
-              <ellipse 
-                cx={78 + pupilOffset.x} 
-                cy={100 + pupilOffset.y} 
-                rx="5" 
-                ry="6" 
-                fill="#2C1810"
-              />
-              <ellipse cx={79 + pupilOffset.x} cy={98 + pupilOffset.y} rx="2.5" ry="3" fill="white" />
+              {/* Left eye - semi-circle + rectangle shape */}
+              <g>
+                {/* Eye white - rounded top, flat bottom */}
+                <path
+                  d="M 68 98 L 68 103 L 88 103 L 88 98 Q 88 90 78 90 Q 68 90 68 98 Z"
+                  fill="white"
+                  stroke="#2C1810"
+                  strokeWidth="2.5"
+                />
+                {/* Pupil */}
+                <ellipse 
+                  cx={78 + pupilOffset.x} 
+                  cy={98 + pupilOffset.y} 
+                  rx="5" 
+                  ry="6" 
+                  fill="#2C1810"
+                />
+                {/* Highlight */}
+                <ellipse 
+                  cx={79 + pupilOffset.x} 
+                  cy={96 + pupilOffset.y} 
+                  rx="2" 
+                  ry="2.5" 
+                  fill="white" 
+                />
+              </g>
               
-              {/* Right eye */}
-              <ellipse 
-                cx="122" 
-                cy="100" 
-                rx="11" 
-                ry="13" 
-                fill="white" 
-                stroke="#2C1810" 
-                strokeWidth="2.5"
-              />
-              <ellipse 
-                cx={122 + pupilOffset.x} 
-                cy={100 + pupilOffset.y} 
-                rx="5" 
-                ry="6" 
-                fill="#2C1810"
-              />
-              <ellipse cx={123 + pupilOffset.x} cy={98 + pupilOffset.y} rx="2.5" ry="3" fill="white" />
+              {/* Right eye - semi-circle + rectangle shape */}
+              <g>
+                {/* Eye white - rounded top, flat bottom */}
+                <path
+                  d="M 112 98 L 112 103 L 132 103 L 132 98 Q 132 90 122 90 Q 112 90 112 98 Z"
+                  fill="white"
+                  stroke="#2C1810"
+                  strokeWidth="2.5"
+                />
+                {/* Pupil */}
+                <ellipse 
+                  cx={122 + pupilOffset.x} 
+                  cy={98 + pupilOffset.y} 
+                  rx="5" 
+                  ry="6" 
+                  fill="#2C1810"
+                />
+                {/* Highlight */}
+                <ellipse 
+                  cx={123 + pupilOffset.x} 
+                  cy={96 + pupilOffset.y} 
+                  rx="2" 
+                  ry="2.5" 
+                  fill="white" 
+                />
+              </g>
             </>
           ) : (
             <>
               {/* Blinking - happy closed eyes */}
-              <path d="M 67 100 Q 78 105 89 100" stroke="#2C1810" strokeWidth="3" fill="none" strokeLinecap="round" />
-              <path d="M 111 100 Q 122 105 133 100" stroke="#2C1810" strokeWidth="3" fill="none" strokeLinecap="round" />
+              <path d="M 68 98 Q 78 103 88 98" stroke="#2C1810" strokeWidth="3" fill="none" strokeLinecap="round" />
+              <path d="M 112 98 Q 122 103 132 98" stroke="#2C1810" strokeWidth="3" fill="none" strokeLinecap="round" />
             </>
           )}
           
-          {/* Eyebrows - bold rectangles with animation - ON TOP of eyes */}
+          {/* Eyebrows - bold rectangles with animation - COVERS the top of eyes */}
           <motion.rect 
-            x="70" 
-            y="85" 
-            width="20" 
-            height="5" 
-            rx="2.5" 
+            x="68" 
+            y="88" 
+            width="22" 
+            height="6" 
+            rx="3" 
             fill="#654321"
             animate={{ rotate: eyeExpr.eyebrowRotate }}
-            style={{ transformOrigin: '80px 87.5px' }}
+            style={{ transformOrigin: '79px 91px' }}
           />
           <motion.rect 
             x="110" 
-            y="85" 
-            width="20" 
-            height="5" 
-            rx="2.5" 
+            y="88" 
+            width="22" 
+            height="6" 
+            rx="3" 
             fill="#654321"
             animate={{ rotate: -eyeExpr.eyebrowRotate }}
-            style={{ transformOrigin: '120px 87.5px' }}
+            style={{ transformOrigin: '121px 91px' }}
           />
           
           {/* Nose - simple triangle */}
