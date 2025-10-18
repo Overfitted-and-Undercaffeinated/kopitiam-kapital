@@ -44,7 +44,11 @@ class Settings(BaseSettings):
     enable_api_calls: bool = True  # Set to False for testing without API calls
     use_mock_llm: bool = False  # Use mock LLM responses for testing
     use_mock_market_data: bool = False  # Use mock market data
-    use_mock_exa: bool = False  # Use mock Exa search
+    use_mock_exa: bool = False  # Use REAL Exa.ai API (was mocked before)
+    
+    # Advanced Features
+    use_mem0: bool = True  # Use Mem0 for user memory and personalization
+    use_mcp_risk_tools: bool = True  # Use MCP server for advanced risk calculations
     
     # Rate Limiting
     enable_rate_limiting: bool = True
