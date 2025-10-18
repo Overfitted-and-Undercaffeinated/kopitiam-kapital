@@ -403,7 +403,7 @@ class ChatOrchestratorAgent:
         Handle backtest requests
         - Translate strategy to JSON
         - Run backtest for each symbol (parallel)
-        - Generate conversational narrative
+        - Generate conversational narrative + PNG charts
         """
         if not symbols:
             return {
@@ -501,16 +501,17 @@ class ChatOrchestratorAgent:
                 if 'visuals' in backtest_result and 'equity_curve' in backtest_result['visuals']:
                     all_chart_data.append({
                         'symbol': symbol,
-                        'equity_curve': backtest_result['visuals']['equity_curve']
+                        'equity_curve': backtest_result['visuals']['equity_curve'],
+                        'backtest_result': backtest_result  # Include full backtest result for metrics
                     })
             
             # Combine narratives
             if len(successful_results) == 1:
                 detailed_response = self._convert_markdown_to_html(narratives[0])
-                short_response = f"I've backtested that {strategy_def['name']} strategy on {symbols[0]}. Check out the results below!"
+                short_response = f"I've backtested that {strategy_def['name']} strategy on {symbols[0]}. Check out the charts and results below!"
             else:
                 detailed_response = self._convert_markdown_to_html("\n\n---\n\n".join(narratives))
-                short_response = f"I've backtested that {strategy_def['name']} strategy on {len(successful_results)} stocks. Results below!"
+                short_response = f"I've backtested that {strategy_def['name']} strategy on {len(successful_results)} stocks. Charts and results below!"
                 
             if failed_symbols:
                 short_response += f" (Note: {', '.join(failed_symbols)} failed)"

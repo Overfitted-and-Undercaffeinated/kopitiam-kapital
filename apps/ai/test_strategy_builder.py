@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Comprehensive test suite for strategy builder
-Tests both translation and execution capabilities
+Tests translation, execution, and returns chart-ready data
 """
 import asyncio
 import json
 import sys
 import os
-import pandas as pd
+from datetime import datetime, timedelta
 
 # Add the current directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -88,33 +88,31 @@ async def test_strategy_translation():
     return successful_strategies
 
 
-async def test_strategy_execution(strategies):
-    """Test if translated strategies can be executed with mock data"""
+async def test_strategy_backtest(strategies):
+    """Run actual backtests with real market data and generate visualizations"""
     from backtesting.builder import strategy_builder
+    from backtesting.engine import BacktestEngine
     
     print("\n" + "=" * 80)
-    print("STRATEGY EXECUTION TEST SUITE")
+    print("STRATEGY BACKTEST & VISUALIZATION SUITE")
     print("=" * 80)
     
-    # Create mock OHLCV data
-    dates = pd.date_range('2023-01-01', periods=100, freq='D')
-    mock_data = pd.DataFrame({
-        'open': [100 + i*0.5 for i in range(100)],
-        'high': [105 + i*0.5 for i in range(100)],
-        'low': [95 + i*0.5 for i in range(100)],
-        'close': [102 + i*0.5 for i in range(100)],
-        'volume': [1000000] * 100
-    }, index=dates)
+    # Backtest parameters
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')  # 1 year
+    initial_capital = 100000.0
     
-    print(f"\nMock data:")
-    print(f"  Shape: {mock_data.shape}")
-    print(f"  Columns: {mock_data.columns.tolist()}")
-    print(f"  Date range: {mock_data.index[0]} to {mock_data.index[-1]}")
+    print(f"\nBacktest Period: {start_date} to {end_date}")
+    print(f"Initial Capital: ${initial_capital:,.2f}")
     
-    execution_results = []
+    engine = BacktestEngine()
+    backtest_results = []
     
     for i, strategy_def in enumerate(strategies, 1):
-        print(f"\n[Execution Test {i}/{len(strategies)}] {strategy_def['name']}")
+        strategy_name = strategy_def['name']
+        symbol = strategy_def.get('symbol', 'AAPL')  # Default to AAPL if not specified
+        
+        print(f"\n[Backtest {i}/{len(strategies)}] {strategy_name} on {symbol}")
         print("-" * 80)
         
         try:
@@ -128,44 +126,64 @@ async def test_strategy_execution(strategies):
             
             # Build the strategy function
             strategy_func = await strategy_builder.build_strategy(strategy_def)
-            print("✅ Strategy function built successfully")
+            print("✅ Strategy function built")
             
-            # Test the strategy function with mock data
-            signal = await strategy_func(mock_data)
-            print(f"   Signal generated: {signal}")
+            # Run backtest
+            print(f"⏳ Running backtest...")
+            results = await engine.run_backtest(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                strategy_fn=strategy_func,
+                initial_capital=initial_capital,
+                include_visuals=True
+            )
             
-            if signal:
-                print("✅ Strategy generated a signal!")
-                execution_results.append({
-                    "name": strategy_def['name'],
-                    "signal": signal,
-                    "status": "success"
-                })
+            print(f"✅ Backtest complete!")
+            print(f"   Trades: {results['num_trades']}")
+            print(f"   Win Rate: {results['win_rate']*100:.1f}%")
+            print(f"   Total Return: ${results['total_return']:,.2f} ({results['total_return_pct']*100:.2f}%)")
+            print(f"   Sharpe Ratio: {results['sharpe_ratio']:.2f}")
+            print(f"   Max Drawdown: {results['max_drawdown']*100:.2f}%")
+            
+            # Show chart data availability
+            if results['num_trades'] > 0 and 'visuals' in results:
+                equity_points = len(results['visuals'].get('equity_curve', []))
+                drawdown_points = len(results['visuals'].get('drawdown_series', []))
+                print(f"   📊 Chart data ready:")
+                print(f"      - Equity curve: {equity_points} data points")
+                print(f"      - Drawdown series: {drawdown_points} data points")
+                print(f"      - Use BacktestChart component in frontend to visualize")
             else:
-                print("⚠️  Strategy did not generate a signal (might need different market conditions)")
-                execution_results.append({
-                    "name": strategy_def['name'],
-                    "signal": None,
-                    "status": "no_signal"
-                })
+                print(f"   ⚠️  No trades generated - no chart data")
+            
+            backtest_results.append({
+                'name': strategy_name,
+                'symbol': symbol,
+                'results': results,
+                'status': 'success'
+            })
                 
         except Exception as e:
             print(f"❌ ERROR: {e}")
             import traceback
             traceback.print_exc()
-            execution_results.append({
-                "name": strategy_def['name'],
-                "signal": None,
-                "status": "error",
-                "error": str(e)
+            backtest_results.append({
+                'name': strategy_name,
+                'symbol': symbol,
+                'status': 'error',
+                'error': str(e)
             })
     
     print("\n" + "=" * 80)
-    success_count = sum(1 for r in execution_results if r['status'] == 'success')
-    print(f"Execution Tests Complete: {success_count}/{len(strategies)} generated signals")
+    success_count = sum(1 for r in backtest_results if r['status'] == 'success')
+    trades_count = sum(r['results']['num_trades'] for r in backtest_results 
+                      if r['status'] == 'success')
+    print(f"Backtest Complete: {success_count}/{len(strategies)} strategies tested")
+    print(f"Total Trades: {trades_count}")
     print("=" * 80)
     
-    return execution_results
+    return backtest_results
 
 
 async def test_invalid_strategies():
@@ -213,17 +231,29 @@ async def main():
     # Test 1: Translation
     strategies = await test_strategy_translation()
     
-    # Test 2: Execution (only if we have successful translations)
+    # Test 2: Backtesting with visualizations (only if we have successful translations)
     if strategies:
-        await test_strategy_execution(strategies)
+        # Store symbol in strategy def for backtest
+        for i, strategy in enumerate(strategies):
+            if i == 0:
+                strategy['symbol'] = 'AAPL'
+            elif i == 1:
+                strategy['symbol'] = 'MSFT'
+            elif i == 2:
+                strategy['symbol'] = 'TSLA'
+            else:
+                strategy['symbol'] = 'GOOGL'
+        
+        await test_strategy_backtest(strategies)
     else:
-        print("\n⚠️  Skipping execution tests - no strategies translated successfully")
+        print("\n⚠️  Skipping backtest tests - no strategies translated successfully")
     
     # Test 3: Error handling
     await test_invalid_strategies()
     
     print("\n" + "=" * 80)
     print("✅ ALL TESTS COMPLETE")
+    print("📊 Chart data is ready - use BacktestChart component to visualize in frontend")
     print("=" * 80)
 
 

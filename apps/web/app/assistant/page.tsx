@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
+import BacktestChart from '@/components/BacktestChart'
 
 const KopiColt2D = dynamic(() => import('../onboarding/components/KopiColt2D'), {
   ssr: false,
@@ -14,6 +15,7 @@ interface Message {
   shortResponse?: string // What Kopi says aloud
   detailedResponse?: string // Detailed text not read aloud
   userMessage?: string
+  metadata?: any // Chart data and other metadata
   timestamp: Date
 }
 
@@ -418,6 +420,46 @@ export default function AssistantPage() {
                               }}
                             />
                           </div>
+                        </div>
+                      )}
+
+                      {/* Backtest Charts */}
+                      {message.metadata?.chart_data && message.metadata.chart_data.length > 0 && (
+                        <div className="mt-4">
+                          {message.metadata.chart_data.map((chartData: any, index: number) => {
+                            // Extract metrics from the backtest result
+                            const backtestResult = chartData.backtest_result || {}
+                            const visuals = backtestResult.visuals || {}
+                            
+                            // Debug logging
+                            console.log('📊 Rendering chart for:', chartData.symbol)
+                            console.log('📊 Chart data:', chartData)
+                            console.log('📊 Backtest result:', backtestResult)
+                            
+                            return (
+                              <div key={index} className="mb-6">
+                                <BacktestChart
+                                  symbol={chartData.symbol}
+                                  strategyName={message.metadata.strategy_name || 'Trading Strategy'}
+                                  equityCurve={chartData.equity_curve || []}
+                                  drawdownSeries={visuals.drawdown_series}
+                                  metrics={{
+                                    total_return: backtestResult.total_return || 0,
+                                    total_return_pct: backtestResult.total_return_pct || 0,
+                                    win_rate: backtestResult.win_rate || 0,
+                                    sharpe_ratio: backtestResult.sharpe_ratio || 0,
+                                    max_drawdown: backtestResult.max_drawdown || 0,
+                                    num_trades: backtestResult.num_trades || 0,
+                                    winning_trades: backtestResult.winning_trades || 0,
+                                    losing_trades: backtestResult.losing_trades || 0,
+                                    profit_factor: backtestResult.profit_factor || 0,
+                                    avg_win: backtestResult.avg_win || 0,
+                                    avg_loss: backtestResult.avg_loss || 0,
+                                  }}
+                                />
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
