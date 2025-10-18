@@ -61,6 +61,7 @@ export default function Home() {
     }
 
     window.addEventListener('scroll', handleScroll)
+    handleScroll() // Initial call
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
@@ -230,6 +231,7 @@ export default function Home() {
                 </div>
               </motion.div>
             </AnimatedSection>
+          </div>
           </div>
         </div>
       </section>
