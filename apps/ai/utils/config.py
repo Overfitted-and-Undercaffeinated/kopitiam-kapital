@@ -39,12 +39,12 @@ class Settings(BaseSettings):
     
     # FEATURE FLAGS
     # Market Data Provider: "yfinance" (free, testing) or "alphavantage" (paid, demo)
-    market_data_provider: Literal["yfinance", "alphavantage"] = "yfinance"
+    market_data_provider: Literal["yfinance", "alphavantage"] = "alphavantage"
     
     # Testing Modes
     enable_api_calls: bool = True  # Set to False for testing without API calls
     use_mock_llm: bool = False  # Use mock LLM responses for testing
-    use_mock_market_data: bool = True  # Use mock data (Yahoo Finance API is rate limiting)
+    use_mock_market_data: bool = True  # Use mock data (Yahoo Finance rate limited)
     use_mock_exa: bool = False  # Use REAL Exa.ai API (was mocked before)
     stocktwits_enabled: bool = False  # StockTwits disabled (removed from sentiment analysis)
     

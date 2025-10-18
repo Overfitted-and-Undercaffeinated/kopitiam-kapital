@@ -77,6 +77,17 @@ export default function BacktestChart({
   // Get starting equity for reference line
   const startingEquity = equityCurve.length > 0 ? equityCurve[0].equity : 100000;
 
+  // Calculate min/max equity for Y-axis scaling
+  const equityValues = equityCurve.map(p => p.equity);
+  const minEquity = Math.min(...equityValues);
+  const maxEquity = Math.max(...equityValues);
+  
+  // Add 5% padding on top and bottom for better visualization
+  const range = maxEquity - minEquity;
+  const padding = range * 0.05;
+  const yAxisMin = Math.floor(minEquity - padding);
+  const yAxisMax = Math.ceil(maxEquity + padding);
+
   // Transform equity curve data for recharts
   const equityData = equityCurve.map((point) => ({
     date: formatDate(point.date),
@@ -127,6 +138,7 @@ export default function BacktestChart({
               stroke="#6b7280"
               tick={{ fill: '#6b7280', fontSize: 12 }}
               tickFormatter={formatCurrency}
+              domain={[yAxisMin, yAxisMax]}
             />
             <Tooltip
               contentStyle={{
