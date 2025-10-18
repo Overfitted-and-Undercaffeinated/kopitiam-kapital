@@ -1,6 +1,11 @@
 """Memory management modules"""
-from .mem0_service import Mem0Service
+from .mem0_service import mem0_service, Mem0Service, DEFAULT_POLICY
 from .policy import PolicyManager
 
-__all__ = ["Mem0Service", "PolicyManager"]
+__all__ = [
+    "mem0_service",
+    "Mem0Service",
+    "DEFAULT_POLICY",
+    "PolicyManager"
+]
 

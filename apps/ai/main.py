@@ -127,6 +127,98 @@ async def analyze_filing(ticker: str, filing_type: str):
     # TODO: Implement long-context analyst
     return {"message": "Not implemented yet"}
 
+# ============================================================================
+# PORTFOLIO MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.post("/portfolio/execute-recommendation")
+async def execute_recommendation(
+    user_id: str,
+    recommendation_id: str,
+    fill_price: float,
+    quantity: int,
+    notes: str = None
+):
+    """
+    Manually record that user executed a recommendation
+    
+    This is MVP manual entry. Post-MVP will auto-sync from broker.
+    """
+    try:
+        from portfolio.position_manager import position_manager
+        
+        position = await position_manager.create_position_from_recommendation(
+            user_id=user_id,
+            recommendation_id=recommendation_id,
+            fill_price=fill_price,
+            quantity=quantity,
+            notes=notes
+        )
+        return {"status": "success", "position": position}
+    
+    except Exception as e:
+        logger.error(f"Error executing recommendation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/portfolio/close-position")
+async def close_position_endpoint(
+    position_id: str,
+    close_price: float,
+    notes: str = None
+):
+    """Close a position and calculate P&L"""
+    try:
+        from portfolio.position_manager import position_manager
+        
+        position = await position_manager.close_position(
+            position_id=position_id,
+            close_price=close_price,
+            notes=notes
+        )
+        return {"status": "success", "position": position}
+    
+    except Exception as e:
+        logger.error(f"Error closing position: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# UTILITY ENDPOINTS
+# ============================================================================
+
+@app.get("/utils/market-hours/{exchange}")
+async def get_market_hours(exchange: str):
+    """Get market hours information for an exchange"""
+    try:
+        from utils.market_hours import market_hours
+        
+        info = market_hours.get_market_info(exchange.upper())
+        
+        if not info:
+            raise HTTPException(status_code=404, detail=f"Exchange {exchange} not found")
+        
+        return info
+    
+    except Exception as e:
+        logger.error(f"Error getting market hours: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/utils/active-markets")
+async def get_active_markets():
+    """Get list of currently open markets"""
+    try:
+        from utils.market_hours import market_hours
+        
+        active = market_hours.get_active_markets()
+        
+        return {
+            "active_markets": active,
+            "count": len(active)
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting active markets: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for unhandled errors"""
