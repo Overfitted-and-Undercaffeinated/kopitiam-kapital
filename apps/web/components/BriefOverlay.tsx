@@ -9,6 +9,17 @@ const KopiColt2D = dynamic(
   { ssr: false }
 )
 
+// Utility function to convert **text** to bold
+const convertMarkdownBold = (text: string): React.ReactNode => {
+  const parts = text.split(/(\*\*.*?\*\*)/)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>
+    }
+    return <span key={i}>{part}</span>
+  })
+}
+
 interface BriefOverlayProps {
   isOpen: boolean
   onClose: () => void
@@ -35,57 +46,43 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
   const [isClosing, setIsClosing] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // If we have raw backend data, display it directly
-  if (rawBackendData) {
-    const sections = [
-      {
-        title: 'Backend Response',
-        narration: rawBackendData.text || "Here's what the AI backend generated, partner!",
-        content: (
-          <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
-            <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">Raw Backend Output</h3>
-            <pre className="text-xs text-[#4A3F35] leading-relaxed whitespace-pre-wrap font-mono bg-white p-4 rounded border border-[#E5E5E5] max-h-[400px] overflow-auto">
-              {JSON.stringify(rawBackendData, null, 2)}
-            </pre>
-          </div>
-        )
-      },
-      {
-        title: 'Generated Text',
-        narration: rawBackendData.text || "No text available",
-        content: (
-          <div className="space-y-4">
-            {/* Audio Player */}
-            {rawBackendData.audio_base64 && (
-              <div className="bg-[#8B7355] rounded-lg p-4 border border-[#6F5D47]">
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl">🎙️</div>
-                  <div className="flex-1">
-                    <h4 className="text-white font-semibold mb-1">🤠 Listen to Kopi Colt</h4>
-                    <audio 
-                      controls 
-                      className="w-full h-10"
-                      src={`data:audio/mp3;base64,${rawBackendData.audio_base64}`}
-                    >
-                      Your browser does not support audio playback.
-                    </audio>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Text Content */}
-            <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
-              <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">AI Generated Brief</h3>
-              <div className="text-[#4A3F35] leading-relaxed whitespace-pre-wrap">
-                {rawBackendData.text}
-              </div>
-            </div>
-          </div>
-        )
+  // Auto-play audio when overlay opens (hidden audio element)
+  useEffect(() => {
+    if (isOpen && rawBackendData?.audio_base64) {
+      // Stop any currently playing audio
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
       }
-    ]
+      
+      try {
+        const audio = new Audio(`data:audio/mp3;base64,${rawBackendData.audio_base64}`)
+        audioRef.current = audio
+        audio.volume = 1.0
+        
+        audio.play().catch(err => {
+          console.log('Auto-play prevented:', err)
+        })
+        
+        audio.onended = () => {
+          setIsPlayingAudio(false)
+          audioRef.current = null
+        }
+        
+        audio.onerror = () => {
+          setIsPlayingAudio(false)
+          audioRef.current = null
+        }
+        
+        setIsPlayingAudio(true)
+      } catch (error) {
+        console.error('Audio playback error:', error)
+      }
+    }
+  }, [isOpen, rawBackendData])
 
+  // If we have raw backend data with text, display it beautified
+  if (rawBackendData?.text) {
     return (
       <AnimatePresence>
         {isOpen && (
@@ -121,7 +118,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
               >
                 <KopiColt2D
                   expression={isClosing ? 'happy' : 'neutral'}
-                  step={currentSection}
+                  step={0}
                   isIntro={false}
                 />
               </motion.div>
@@ -171,7 +168,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
                     </div>
                   </div>
                   <motion.button
-                    onClick={onClose}
+                    onClick={handleClose}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="w-10 h-10 rounded-lg bg-[#FAFAF9] hover:bg-[#F5F5F4] flex items-center justify-center text-[#6B5D52] hover:text-[#2F1810] transition-colors border border-[#E5E5E5]"
@@ -182,47 +179,38 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
                   </motion.button>
                 </div>
 
-                <div className="p-6 space-y-6">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentSection}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      {sections[currentSection].content}
-                    </motion.div>
-                  </AnimatePresence>
-
-                  <div className="flex items-center gap-2 justify-center">
-                    {sections.map((_, idx) => (
-                      <div
-                        key={idx}
-                        className={`h-2 rounded-full transition-all ${
-                          idx === currentSection
-                            ? 'w-8 bg-[#8B7355]'
-                            : idx < currentSection
-                            ? 'w-2 bg-[#8B7355]/50'
-                            : 'w-2 bg-[#E5E5E5]'
-                        }`}
-                      />
-                    ))}
+                <div className="p-6">
+                  {/* Main brief text with bold formatting */}
+                  <div className="bg-[#FAFAF9] rounded-lg p-6 border border-[#E5E5E5]">
+                    <div className="text-[#4A3F35] leading-relaxed whitespace-pre-wrap text-lg">
+                      {convertMarkdownBold(rawBackendData.text)}
+                    </div>
                   </div>
 
+                  {/* Audio status indicator */}
+                  {isPlayingAudio && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4 flex items-center justify-center gap-2 text-[#8B7355]"
+                    >
+                      <motion.span
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                      >
+                        🔊
+                      </motion.span>
+                      <span className="text-sm font-semibold">Kopi is reading your brief...</span>
+                    </motion.div>
+                  )}
+
                   <motion.button
-                    onClick={() => {
-                      if (currentSection < sections.length - 1) {
-                        setCurrentSection(currentSection + 1)
-                      } else {
-                        onClose()
-                      }
-                    }}
+                    onClick={handleClose}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full py-4 rounded-lg font-semibold text-white bg-[#8B7355] hover:bg-[#6F5D47] transition-all"
+                    className="w-full mt-6 py-4 rounded-lg font-semibold text-white bg-[#8B7355] hover:bg-[#6F5D47] transition-all"
                   >
-                    {currentSection < sections.length - 1 ? `Continue ${currentSection + 1}/${sections.length}` : "Thanks Kopi! 🤠"}
+                    Thanks Kopi! 🤠
                   </motion.button>
                 </div>
               </motion.div>
@@ -233,7 +221,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
     )
   }
 
-  // Original formatted display (fallback)
+  // Original formatted display (fallback when no raw data)
   const sections = [
     {
       title: 'greeting',
@@ -248,7 +236,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
       content: (
         <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
           <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">Summary</h3>
-          <p className="text-[#4A3F35] leading-relaxed">{brief.summary}</p>
+          <p className="text-[#4A3F35] leading-relaxed">{convertMarkdownBold(brief.summary)}</p>
         </div>
       )
     },
@@ -258,7 +246,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
       content: (
         <div className="bg-[#FAFAF9] rounded-lg p-5 border border-[#E5E5E5]">
           <h3 className="text-lg font-semibold mb-3 text-[#2F1810]">Market Overview</h3>
-          <p className="text-[#4A3F35] leading-relaxed">{brief.market_overview}</p>
+          <p className="text-[#4A3F35] leading-relaxed">{convertMarkdownBold(brief.market_overview)}</p>
         </div>
       )
     },
@@ -278,7 +266,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
                 transition={{ delay: idx * 0.1 }}
               >
                 <span className="text-[#8B7355] mt-1">•</span>
-                <span className="text-[#4A3F35] flex-1">{point}</span>
+                <span className="text-[#4A3F35] flex-1">{convertMarkdownBold(point)}</span>
               </motion.li>
             ))}
           </ul>
@@ -329,7 +317,7 @@ export default function BriefOverlay({ isOpen, onClose, type, brief, rawBackendD
                 transition={{ delay: idx * 0.1 }}
               >
                 <span className="text-green-600 mt-1">→</span>
-                <span className="text-[#4A3F35] flex-1">{rec}</span>
+                <span className="text-[#4A3F35] flex-1">{convertMarkdownBold(rec)}</span>
               </motion.li>
             ))}
           </ul>

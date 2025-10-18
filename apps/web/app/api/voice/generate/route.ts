@@ -54,10 +54,24 @@ export async function POST(request: NextRequest) {
     )
 
     if (!response.ok) {
-      const error = await response.text()
-      console.error('ElevenLabs API error:', error)
+      const errorText = await response.text()
+      console.error('ElevenLabs API error:', errorText)
+      
+      // Check if it's a quota exceeded error
+      let errorData = null
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {}
+      
+      if (errorData?.detail?.status === 'quota_exceeded') {
+        return NextResponse.json(
+          { error: 'quota_exceeded', message: 'Voice API quota exceeded' },
+          { status: 429 }
+        )
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to generate voice' },
+        { error: 'Failed to generate voice', details: errorText },
         { status: response.status }
       )
     }

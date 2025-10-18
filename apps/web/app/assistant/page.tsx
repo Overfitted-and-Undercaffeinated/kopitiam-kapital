@@ -98,44 +98,51 @@ export default function AssistantPage() {
     }
   }
 
-  const generateHardcodedResponse = (userQuestion: string): { short: string; detailed: string } => {
-    const question = userQuestion.toLowerCase()
+  const fetchRealAIResponse = async (userQuestion: string): Promise<{ short: string; detailed: string }> => {
+    const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+    const userId = localStorage.getItem('userId') || 'demo_user'
     
-    // Hardcoded responses based on keywords
-    if (question.includes('apple') || question.includes('aapl')) {
-      return {
-        short: `Howdy there ${userName}! Given the current market conditions, I'mma say hold off on Apple for now, partner.`,
-        detailed: `Here's why I'm cautious on AAPL right now:\n\n• **Valuation Concerns**: Trading at 28x P/E, which is above historical averages\n• **China Headwinds**: iPhone sales in China down 15% YoY due to local competition\n• **Margin Pressure**: Services growth slowing, hardware margins compressing\n• **Technical Setup**: RSI showing overbought conditions at 72\n\nBetter entry would be around $165-170 range. Keep it on your watchlist and I'll holler when conditions improve!`
+    try {
+      console.log('🤖 Calling AI Orchestrator:', { query: userQuestion, userId })
+      
+      const response = await fetch(`${AI_API_URL}/ai/orchestrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: userQuestion,
+          user_id: userId,
+          context: {
+            userName: userName,
+            timestamp: new Date().toISOString()
+          }
+        }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      })
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
       }
-    } else if (question.includes('dbs') || question.includes('bank')) {
+      
+      const data = await response.json()
+      console.log('✅ AI Response received:', data)
+      
+      // Extract response text - the orchestrator returns a response field
+      const responseText = data.response || data.text || data.message || 'No response from AI'
+      
+      // Split response into short (first paragraph) and detailed (full text)
+      const paragraphs = responseText.split('\n\n').filter((p: string) => p.trim().length > 0)
+      const short = paragraphs[0] || responseText.substring(0, 200)
+      const detailed = responseText
+      
+      return { short, detailed }
+      
+    } catch (error) {
+      console.error('❌ AI API Error:', error)
+      
+      // Fallback to a friendly error message
       return {
-        short: `Well partner, DBS is lookin' mighty fine right now! I'd say it's a buy at current levels.`,
-        detailed: `Here's the bull case for DBS:\n\n• **Strong Earnings**: Beat expectations by 8% last quarter with ROE at 18%\n• **Rising Rates**: Net interest margin expanding, expected to hit 2.1% this year\n• **Dividend Yield**: 5.2% yield with consistent payout history\n• **Valuation**: Trading at 1.2x book value, reasonable for quality\n• **Technical**: Breaking above resistance at $35, momentum building\n\nEntry: $35.20 | Target: $37.50 | Stop: $34.00\nPosition size: 2-3% of portfolio for moderate risk profile`
-      }
-    } else if (question.includes('sgx') || question.includes('singapore')) {
-      return {
-        short: `The Straits Times Index is lookin' steady as a mule, ${userName}. Market's in consolidation mode.`,
-        detailed: `STI Market Overview:\n\n• **Current Level**: 3,245 points, up 0.3% today\n• **Trend**: Range-bound between 3,200-3,280 for past 3 weeks\n• **Sector Leaders**: Banks leading with DBS, UOB, OCBC all up 1%+\n• **Laggards**: Tech sector down on US chip restrictions\n• **Volume**: Above average at 1.2B shares, showing healthy participation\n• **Outlook**: Watching 3,280 resistance - breakout could target 3,350\n\nBest opportunities right now are in banking sector and quality REITs with stable yields.`
-      }
-    } else if (question.includes('portfolio') || question.includes('holdings')) {
-      return {
-        short: `Your portfolio's sittin' pretty at $52,450, up 1.3% today. Nice work, partner!`,
-        detailed: `Portfolio Summary:\n\n• **Total Value**: $52,450\n• **Today's P&L**: +$685 (+1.3%)\n• **All-Time Return**: +8.5%\n• **Open Positions**: 5\n\n**Top Performers Today**:\n1. DBS - +$450 (+1.5%)\n2. OCBC - +$95 (+0.8%)\n3. CapitaLand - +$70 (+0.6%)\n\n**Risk Metrics**:\n• Portfolio Beta: 0.85 (lower volatility than market)\n• Max Drawdown: -3.2% (well controlled)\n• Sharpe Ratio: 1.4 (good risk-adjusted returns)\n\nYou're well-diversified across banks and blue chips. Consider adding some growth exposure if risk appetite allows.`
-      }
-    } else if (question.includes('market') || question.includes('today')) {
-      return {
-        short: `Markets are ridin' high today, ${userName}! STI up 0.45%, banks gallopin' ahead!`,
-        detailed: `Today's Market Highlights:\n\n**Singapore (STI)**:\n• Up 0.45% at 3,259 points\n• Banking sector +1.2% leading the charge\n• Volume: 1.2B shares (above average)\n\n**Regional Markets**:\n• Hong Kong HSI: -0.3%\n• Japan Nikkei: +0.8%\n• South Korea KOSPI: +0.4%\n\n**Key Drivers**:\n• Strong DBS earnings beat boosting banking sector\n• GDP revision upward to 3.2% supporting sentiment\n• Fed Chair speech tonight at 10PM SGT - watch for volatility\n\n**Trading Opportunities**:\n• Banks showing momentum - DBS, UOB looking strong\n• REITs stable with rate outlook improving\n• Tech oversold - potential bounce plays`
-      }
-    } else if (question.includes('crypto') || question.includes('bitcoin')) {
-      return {
-        short: `Whoa there, partner! Crypto's wild country. For SGX traders, I'd say stick to what you know best.`,
-        detailed: `Crypto Market Assessment:\n\n**My Take**: Not recommending crypto exposure for traditional SGX portfolios\n\n**Reasons**:\n• **High Volatility**: Bitcoin down 40% from peaks, massive swings\n• **Regulatory Uncertainty**: Singapore MAS tightening crypto regulations\n• **Correlation Risk**: Now moving with tech stocks, losing diversification benefit\n• **Better Alternatives**: Singapore banks offering 5%+ dividends with lower risk\n\n**If You Must**:\n• Keep to <5% of portfolio\n• Use dollar-cost averaging\n• Only invest what you can afford to lose\n• Consider Bitcoin/Ethereum only (avoid altcoins)\n\nFor steady income and capital preservation, Singapore blue chips are your best bet, partner.`
-      }
-    } else {
-      return {
-        short: `That's a good question, ${userName}! Let me rustle up some info on that for ya.`,
-        detailed: `I'm still learnin' the ropes on this one, partner. Here's what I can tell ya:\n\n• **Market Conditions**: Generally favorable for quality stocks\n• **Risk Environment**: Moderate - keep position sizes in check\n• **Opportunities**: Banking sector and dividend plays looking good\n• **Caution Areas**: High-growth tech, speculative plays\n\nFor specific stock recommendations, try asking me about:\n• Singapore blue chips (DBS, UOB, OCBC, CapitaLand)\n• Market outlook and STI trends\n• Your portfolio performance\n• Sector analysis\n\nWhat else can I help you with today?`
+        short: `Whoa there, ${userName}! My AI brain's takin' a coffee break. Let me give ya what I remember...`,
+        detailed: `I'm havin' trouble connectin' to the main AI engine right now, partner. This might be because:\n\n• The backend server isn't runnin' (try: cd apps/ai && uvicorn main:app --reload)\n• Network connection issues\n• API timeout (your question might need more thinkin' time)\n\nIn the meantime, here's some general advice:\n\n• For stock recommendations, I typically analyze sentiment from multiple sources (news, Reddit, social media)\n• I run backtests to validate strategies before recommendin' 'em\n• I personalize recommendations based on your risk profile in Mem0\n\nTry askin' me again in a moment, or check that the AI backend is runnin'!`
       }
     }
   }
@@ -156,11 +163,8 @@ export default function AssistantPage() {
     }
     setMessages(prev => [...prev, userMsg])
 
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    // Generate response
-    const response = generateHardcodedResponse(userQuestion)
+    // Fetch real AI response from backend
+    const response = await fetchRealAIResponse(userQuestion)
 
     // Add assistant message
     const assistantMsg: Message = {
@@ -265,6 +269,29 @@ export default function AssistantPage() {
           </div>
         </div>
       </header>
+
+      {/* Quick Access Navigation */}
+      <div className="bg-white/90 backdrop-blur-sm border-b border-[#E5E5E5]">
+        <div className="container mx-auto px-6">
+          <div className="flex gap-1 overflow-x-auto py-2">
+            <a href="/sentiment" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📊 Sentiment
+            </a>
+            <a href="/backtest" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📈 Backtest
+            </a>
+            <a href="/alerts" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              🔔 Alerts
+            </a>
+            <a href="/analysis" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              📄 Analysis
+            </a>
+            <a href="/portfolio" className="px-4 py-2 rounded-lg text-sm font-medium text-[#6B5D52] hover:bg-white hover:text-[#2F1810] transition-colors whitespace-nowrap">
+              💼 Portfolio
+            </a>
+          </div>
+        </div>
+      </div>
 
       <div className="container mx-auto px-6 py-8 max-w-6xl">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-180px)]">

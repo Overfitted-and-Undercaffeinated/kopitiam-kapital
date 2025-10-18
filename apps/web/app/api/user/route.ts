@@ -7,12 +7,16 @@ import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase-server
  */
 export async function GET(request: Request) {
   try {
+    console.log('🔍 /api/user called')
     const supabase = await createServerSupabaseClient()
     
     // Get the authenticated user
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+    console.log('🔐 Auth user:', authUser ? { id: authUser.id, email: authUser.email } : 'None')
+    console.log('❌ Auth error:', authError)
 
     if (authError || !authUser) {
+      console.log('❌ Not authenticated, returning 401')
       return NextResponse.json(
         { error: 'Not authenticated', message: 'No user session found' },
         { status: 401 }
@@ -20,6 +24,7 @@ export async function GET(request: Request) {
     }
 
     // Get user profile from database with their watchlist and positions
+    console.log('🔍 Fetching user profile for ID:', authUser.id)
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select(`
@@ -50,13 +55,20 @@ export async function GET(request: Request) {
       .is('positions.closed_at', null)
       .single()
 
+    console.log('📦 User profile query result:', { user, userError })
+    if (user) {
+      console.log('✅ User profile found:', { id: user.id, name: user.name, email: user.email })
+    }
+
     if (userError || !user) {
+      console.log('❌ User profile not found, returning 404')
       return NextResponse.json(
         { error: 'User not found', message: 'User profile not found' },
         { status: 404 }
       )
     }
 
+    console.log('✅ Returning user data successfully')
     return NextResponse.json({
       success: true,
       user: user,
